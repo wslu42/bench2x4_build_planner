@@ -4,6 +4,7 @@ export const STOCK_LENGTH = 96;
 export const SAW_KERF = 0.125;
 
 export type FurnitureType = "top-surface" | "shelving";
+export type FrameMode = "h-frame" | "p-frame";
 export type ViewMode = "top" | "side" | "front" | "assembly";
 
 export type CommonInputs = {
@@ -21,6 +22,7 @@ export type TopSurfaceInputs = CommonInputs & {
 export type ShelvingInputs = CommonInputs & {
   furnitureType: "shelving";
   shelfLevelCount: number;
+  frameMode: FrameMode;
 };
 
 export type AppInputs = TopSurfaceInputs | ShelvingInputs;
@@ -29,6 +31,7 @@ export type PartGroup =
   | "top-board"
   | "shelf-board"
   | "vertical-leg"
+  | "rear-leg"
   | "side-rail";
 
 export type Part = {
@@ -63,6 +66,7 @@ export type DerivedDesign = {
   estimatedScrewCount: number;
   sideRailLength: number;
   legVerticalLength: number;
+  rearLegLength: number;
   boardCountPerLevel: number;
   shelfLevelCount: number;
   issues: string[];
@@ -253,6 +257,7 @@ export function deriveDesign(inputs: AppInputs): DerivedDesign {
           maxSpan: safeMaxSpan,
           bottomRailClearance: safeBottomRailClearance,
           shelfLevelCount: safeShelfLevelCount,
+          frameMode: inputs.frameMode,
         };
 
   const { frameCount, framePositions, actualClearSpan } = deriveFrameLayout(
@@ -271,6 +276,10 @@ export function deriveDesign(inputs: AppInputs): DerivedDesign {
     normalizedInputs.furnitureType === "top-surface"
       ? normalizedInputs.height - BOARD_THICKNESS
       : normalizedInputs.height;
+  const rearLegLength =
+    normalizedInputs.furnitureType === "shelving" && normalizedInputs.frameMode === "p-frame"
+      ? Math.max(0, normalizedInputs.height - (normalizedInputs.bottomRailClearance + 2 * BOARD_THICKNESS))
+      : legVerticalLength;
 
   if (normalizedInputs.furnitureType === "shelving") {
     const highestRailBottom = normalizedInputs.height - 2 * BOARD_THICKNESS;
@@ -339,12 +348,28 @@ export function deriveDesign(inputs: AppInputs): DerivedDesign {
           },
           {
             key: "vertical-leg",
-            label: "Vertical Legs",
-            purpose: "H-frame vertical legs",
+            label:
+              normalizedInputs.frameMode === "p-frame" ? "Front Legs" : "Vertical Legs",
+            purpose:
+              normalizedInputs.frameMode === "p-frame"
+                ? "Full-height front legs"
+                : "H-frame vertical legs",
             length: legVerticalLength,
-            quantity: 2 * frameCount,
+            quantity: normalizedInputs.frameMode === "p-frame" ? frameCount : 2 * frameCount,
             color: "#0f766e",
           },
+          ...(normalizedInputs.frameMode === "p-frame"
+            ? [
+                {
+                  key: "rear-leg" as const,
+                  label: "Rear Legs",
+                  purpose: "Inset rear legs starting at the lowest shelf board",
+                  length: rearLegLength,
+                  quantity: frameCount,
+                  color: "#0f766e",
+                },
+              ]
+            : []),
           {
             key: "side-rail",
             label: "Side Rails",
@@ -378,6 +403,7 @@ export function deriveDesign(inputs: AppInputs): DerivedDesign {
     estimatedScrewCount,
     sideRailLength,
     legVerticalLength,
+    rearLegLength,
     boardCountPerLevel,
     shelfLevelCount,
     issues,

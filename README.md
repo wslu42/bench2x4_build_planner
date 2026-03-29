@@ -16,7 +16,7 @@ The current landing view opens on the gallery first, where example builds can be
 - Opens with a gallery of example builds and photos
 - Lets gallery photos open in a larger preview
 - Loads gallery presets directly into the planner
-- Generates `top / side / front` orthographic previews
+- Generates `top / side / front / assembly` previews
 - Calculates a cut list from fixed 2x4 rules
 - Optimizes cuts against `8 ft` stock boards
 - Estimates screws from rail-to-leg joints
@@ -29,6 +29,25 @@ The current landing view opens on the gallery first, where example builds can be
 - Saw kerf: `1/8"`
 - Frame spacing is derived from `Max Span`
 - `Max Span` means the unsupported clear span between adjacent frames
+- Planner default `Max Span` is `48"` with a minimum of `6"` and `6"` stepping
+- The planner opens to `Assembly` view by default
+- Loading any gallery build also opens the planner in `Assembly` view using `solid` fill mode
+
+## Shelving Modes
+
+Shelving supports two frame modes:
+
+- `H-frame`: front and rear legs both run full height
+- `P-frame`: rear legs are cut off below the lowest shelf board, while front legs remain full height
+
+## Shelving Assembly View Rules
+
+The shelving assembly preview intentionally differs from the bench assembly preview in two ways:
+
+- Front legs extend `1.5"` above the top shelf board in `Assembly` view only
+- Front legs render above the top shelf board, so the front posts remain visually dominant in the stacked shelf view
+
+Bench assembly keeps the opposite behavior: top boards remain above the front legs and the legs are not extended.
 
 ## Pricing Defaults
 

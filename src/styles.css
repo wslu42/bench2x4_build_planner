@@ -274,7 +274,7 @@ select {
 .preview-canvas {
   margin-top: 24px;
   display: grid;
-  gap: 10px;
+  gap: 4px;
 }
 
 .preview-canvas svg {
@@ -287,7 +287,7 @@ select {
   display: flex;
   flex-wrap: wrap;
   gap: 10px 16px;
-  padding: 0 8px;
+  padding: 2px 8px 0;
 }
 
 .panel-preview > .panel-section + .panel-section {
@@ -295,7 +295,7 @@ select {
 }
 
 .panel-preview .chip-list {
-  margin-top: 28px;
+  margin-top: 36px;
   gap: 12px;
 }
 
@@ -575,7 +575,8 @@ th {
 
 .shopping-total-row strong {
   grid-column: 5;
-  justify-self: start;
+  justify-self: end;
+  text-align: right;
   font-size: 1.1rem;
 }
 
@@ -901,12 +902,12 @@ th {
   }
 
   .shopping-total-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 8px;
+    grid-template-columns: 24% 20% 30% 10% 16%;
+    gap: 8px 0;
   }
 
   .shopping-total-label {
-    grid-column: 1;
+    grid-column: 1 / span 3;
   }
 
   .shopping-total-spacer {
@@ -914,8 +915,9 @@ th {
   }
 
   .shopping-total-row strong {
-    grid-column: 2;
-    justify-self: start;
+    grid-column: 5;
+    justify-self: end;
+    text-align: right;
     min-width: 0;
   }
 
@@ -1042,6 +1044,14 @@ th {
   .shopping-table th:nth-child(5),
   .shopping-table td:nth-child(5) {
     width: 20%;
+  }
+
+  .shopping-total-row {
+    grid-template-columns: 22% 18% 29% 11% 20%;
+  }
+
+  .shopping-total-label {
+    grid-column: 1 / span 3;
   }
 
   .preview-legend {

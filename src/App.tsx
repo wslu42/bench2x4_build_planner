@@ -5,7 +5,10 @@ import {
   SAW_KERF,
   STOCK_LENGTH,
   type AppInputs,
+  type FrameMode,
   type FurnitureType,
+  type ShelvingInputs,
+  type TopSurfaceInputs,
   type ViewMode,
   deriveDesign,
   deriveFrameLayout,
@@ -19,6 +22,7 @@ import twoTierShelfImage from "./gallery_asset/two_tier_shelf_L51_D17p5_H92.jpg"
 type FillMode = "solid" | "pattern";
 type ColorTheme = "rainbow" | "pinkblue" | "neon" | "sunset" | "violet";
 type PageMode = "planner" | "gallery";
+type GalleryBuildInputs = Omit<TopSurfaceInputs, "maxSpan"> | Omit<ShelvingInputs, "maxSpan">;
 
 type GalleryBuild = {
   id: string;
@@ -26,7 +30,7 @@ type GalleryBuild = {
   category: "Bench" | "Shelving";
   description: string;
   imageSrc: string;
-  inputs: AppInputs;
+  inputs: GalleryBuildInputs;
 };
 
 type GalleryPreview = {
@@ -72,8 +76,7 @@ const GALLERY_BUILDS: GalleryBuild[] = [
       length: 24,
       depth: 14,
       height: 19,
-      maxSpan: 44,
-      bottomRailClearance: 6,
+      bottomRailClearance: 8,
     },
   },
   {
@@ -87,8 +90,7 @@ const GALLERY_BUILDS: GalleryBuild[] = [
       length: 60,
       depth: 14,
       height: 17.5,
-      maxSpan: 44,
-      bottomRailClearance: 6,
+      bottomRailClearance: 4.5,
     },
   },
   {
@@ -102,9 +104,9 @@ const GALLERY_BUILDS: GalleryBuild[] = [
       length: 51,
       depth: 17.5,
       height: 92,
-      maxSpan: 44,
-      bottomRailClearance: 6,
+      bottomRailClearance: 42.5,
       shelfLevelCount: 2,
+      frameMode: "h-frame",
     },
   },
   {
@@ -118,9 +120,9 @@ const GALLERY_BUILDS: GalleryBuild[] = [
       length: 33,
       depth: 17.5,
       height: 92,
-      maxSpan: 44,
-      bottomRailClearance: 6,
+      bottomRailClearance: 13,
       shelfLevelCount: 3,
+      frameMode: "h-frame",
     },
   },
 ];
@@ -128,13 +130,14 @@ const GALLERY_BUILDS: GalleryBuild[] = [
 function App() {
   const [pageMode, setPageMode] = useState<PageMode>("gallery");
   const [furnitureType, setFurnitureType] = useState<FurnitureType>("top-surface");
-  const [viewMode, setViewMode] = useState<ViewMode>("side");
+  const [viewMode, setViewMode] = useState<ViewMode>("assembly");
   const [length, setLength] = useState(72);
   const [depth, setDepth] = useState(14.5);
   const [height, setHeight] = useState(17.5);
-  const [maxSpan, setMaxSpan] = useState(44);
+  const [maxSpan, setMaxSpan] = useState(48);
   const [bottomRailClearance, setBottomRailClearance] = useState(6);
   const [shelfLevelCount, setShelfLevelCount] = useState(3);
+  const [frameMode, setFrameMode] = useState<FrameMode>("h-frame");
   const [fillMode, setFillMode] = useState<FillMode>("solid");
   const [galleryPreview, setGalleryPreview] = useState<GalleryPreview | null>(null);
   const colorTheme: ColorTheme = "sunset";
@@ -159,27 +162,31 @@ function App() {
 
     if (nextType === "top-surface") {
       setHeight(17.5);
-      setMaxSpan(44);
+      setMaxSpan(48);
       setBottomRailClearance(6);
+      setFrameMode("h-frame");
       return;
     }
 
     setHeight(44);
-    setMaxSpan(44);
+    setMaxSpan(48);
     setBottomRailClearance(6);
+    setFrameMode("h-frame");
   };
 
-  const applyBuildPreset = (presetInputs: AppInputs) => {
+  const applyBuildPreset = (presetInputs: GalleryBuildInputs) => {
     setFurnitureType(presetInputs.furnitureType);
     setLength(presetInputs.length);
     setDepth(presetInputs.depth);
     setHeight(presetInputs.height);
-    setMaxSpan(presetInputs.maxSpan);
+    setMaxSpan(48);
     setBottomRailClearance(presetInputs.bottomRailClearance);
     setShelfLevelCount(
       presetInputs.furnitureType === "shelving" ? presetInputs.shelfLevelCount : 3,
     );
-    setViewMode("side");
+    setFrameMode(presetInputs.furnitureType === "shelving" ? presetInputs.frameMode : "h-frame");
+    setViewMode("assembly");
+    setFillMode("solid");
     setPageMode("planner");
   };
 
@@ -203,10 +210,12 @@ function App() {
       maxSpan,
       bottomRailClearance,
       shelfLevelCount,
+      frameMode,
     };
   }, [
     bottomRailClearance,
     depth,
+    frameMode,
     furnitureType,
     height,
     length,
@@ -226,6 +235,7 @@ function App() {
     "top-board": { fill: "#FF7B00", stroke: "#BF5C00" },
     "shelf-board": { fill: "#FF7B00", stroke: "#BF5C00" },
     "vertical-leg": { fill: "#B68A2E", stroke: "#8A6822" },
+    "rear-leg": { fill: "#B68A2E", stroke: "#8A6822" },
     "side-rail": { fill: "#3A86FF", stroke: "#2B63BF" },
   };
 
@@ -240,6 +250,7 @@ function App() {
     isTopSurface
       ? `Top boards derived from outer depth: ${design.boardCountPerLevel}`
       : `Shelf boards per level derived from inner depth: ${design.boardCountPerLevel}`,
+    !isTopSurface ? `Frame mode: ${frameMode}` : null,
   ];
 
   useEffect(() => {
@@ -266,10 +277,14 @@ function App() {
     if (!isTopSurface && shelfLevelCount !== effectiveInputs.shelfLevelCount) {
       setShelfLevelCount(effectiveInputs.shelfLevelCount);
     }
+    if (!isTopSurface && frameMode !== effectiveInputs.frameMode) {
+      setFrameMode(effectiveInputs.frameMode);
+    }
   }, [
     bottomRailClearance,
     depth,
     effectiveInputs,
+    frameMode,
     height,
     isTopSurface,
     length,
@@ -332,7 +347,7 @@ function App() {
             <NumberField label="Length (in)" value={length} min={12} onChange={setLength} />
             <NumberField label="Depth (in)" value={depth} min={3.5} onChange={setDepth} />
             <NumberField label="Height (in)" value={height} min={3.5} onChange={setHeight} />
-            <NumberField label="Max Span (in)" value={maxSpan} min={1} onChange={setMaxSpan} />
+            <NumberField label="Max Span (in)" value={maxSpan} min={6} step={6} onChange={setMaxSpan} />
             <NumberField
               label="Bottom Rail Clearance (in)"
               value={bottomRailClearance}
@@ -349,6 +364,29 @@ function App() {
               />
             ) : null}
           </section>
+
+          {!isTopSurface ? (
+            <section className="panel-section">
+              <div className="panel-section-header">
+                <h3>Frame Mode</h3>
+              </div>
+              <div className="segmented" aria-label="Frame Mode">
+                {([
+                  { value: "h-frame", label: "H-frame" },
+                  { value: "p-frame", label: "P-frame" },
+                ] as const).map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={frameMode === option.value ? "active" : ""}
+                    onClick={() => setFrameMode(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           <section className="panel-section">
             <h3>Derived Summary</h3>
@@ -541,13 +579,13 @@ function App() {
                               "--swatch-color":
                                 part.key === "top-board" || part.key === "shelf-board"
                                   ? "#FF7B00"
-                                  : part.key === "vertical-leg"
+                                  : part.key === "vertical-leg" || part.key === "rear-leg"
                                     ? "#B68A2E"
                                     : "#3A86FF",
                               backgroundColor:
                                 part.key === "top-board" || part.key === "shelf-board"
                                   ? "#FF7B00"
-                                  : part.key === "vertical-leg"
+                                  : part.key === "vertical-leg" || part.key === "rear-leg"
                                     ? "#B68A2E"
                                     : "#3A86FF",
                             } as CSSProperties
@@ -742,7 +780,6 @@ function App() {
                         <li>{`L ${formatInches(buildInputs.length)}`}</li>
                         <li>{`D ${formatInches(buildInputs.depth)}`}</li>
                         <li>{`H ${formatInches(buildInputs.height)}`}</li>
-                        <li>{`Max Span ${formatInches(buildInputs.maxSpan)}`}</li>
                         <li>{`Clearance ${formatInches(buildInputs.bottomRailClearance)}`}</li>
                         {shelfLevelsLabel ? <li>{shelfLevelsLabel}</li> : null}
                       </ul>
@@ -995,10 +1032,12 @@ function PreviewCanvas({
     supportStroke,
   } = palette;
   const datumColor = "#8b7357";
-  const boardLineColor = fillMode === "pattern" ? boardColor : boardStroke;
-  const legLineColor = fillMode === "pattern" ? legColor : legStroke;
-  const railLineColor = fillMode === "pattern" ? railColor : railStroke;
-  const supportLineColor = fillMode === "pattern" ? supportColor : supportStroke;
+  const assemblyUsesSolidStroke = viewMode === "assembly" && fillMode === "pattern";
+  const boardLineColor = fillMode === "pattern" && !assemblyUsesSolidStroke ? boardColor : boardStroke;
+  const legLineColor = fillMode === "pattern" && !assemblyUsesSolidStroke ? legColor : legStroke;
+  const railLineColor = fillMode === "pattern" && !assemblyUsesSolidStroke ? railColor : railStroke;
+  const supportLineColor =
+    fillMode === "pattern" && !assemblyUsesSolidStroke ? supportColor : supportStroke;
   const boardFill = fillMode === "solid" ? boardColor : "url(#boardPattern)";
   const legFill = fillMode === "solid" ? legColor : "url(#legPattern)";
   const railFill = fillMode === "solid" ? railColor : "url(#railPattern)";
@@ -1008,6 +1047,8 @@ function PreviewCanvas({
   const bottomRailTop = bottomRailBottom + BOARD_THICKNESS;
   const innerDepth = inputs.depth - 2 * BOARD_THICKNESS;
   const visibleLegHeight = isTopSurface ? inputs.height - BOARD_THICKNESS : inputs.height;
+  const assemblyLegHeight =
+    inputs.furnitureType === "shelving" ? visibleLegHeight + BOARD_THICKNESS : visibleLegHeight;
   const sectionRadius = Math.max(2, Math.min(8, BOARD_THICKNESS * scale * 0.45));
   const boardGap =
     boardCount <= 1 ? 0 : Math.max(0, (innerDepth - boardCount * BOARD_WIDTH) / (boardCount - 1));
@@ -1042,6 +1083,12 @@ function PreviewCanvas({
     !isTopSurface && levelBottoms.length > 1
       ? Math.max(0, levelBottoms[1] - (levelBottoms[0] + 2 * BOARD_THICKNESS))
       : 0;
+  const rearLegBaseHeight =
+    !isTopSurface && inputs.frameMode === "p-frame" && levelBottoms.length > 0
+      ? levelBottoms[0] + 2 * BOARD_THICKNESS
+      : 0;
+  const rearLegVisibleHeight = Math.max(0, visibleLegHeight - rearLegBaseHeight);
+  const assemblyRearLegHeight = Math.max(0, assemblyLegHeight - rearLegBaseHeight);
 
   const screwColor = "#5f2f1f";
   const legendItems = isTopSurface
@@ -1079,6 +1126,26 @@ function PreviewCanvas({
       Math.max(0, Math.min(255, Math.round(channel + (amount >= 0 ? (255 - channel) * amount : channel * amount))));
     return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
   };
+  const colorWithAlpha = (color: string, alpha: number) => {
+    if (color.startsWith("#")) {
+      const value = color.replace("#", "");
+      const [r, g, b] = [0, 2, 4].map((index) => parseInt(value.slice(index, index + 2), 16));
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    const match = color.match(/\d+(\.\d+)?/g);
+    if (!match || match.length < 3) {
+      return color;
+    }
+
+    const [r, g, b] = match;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+  const assemblyPatternAlpha =
+    viewMode === "assembly" && fillMode === "pattern"
+      ? (faceColor: string) =>
+          faceColor === railColor ? 1 : 0.5
+      : () => 1;
 
   const assemblySkewX = 0.52;
   const assemblySkewY = 0.28;
@@ -1104,27 +1171,36 @@ function PreviewCanvas({
 
     const facePoints = (points: { x: number; y: number }[]) =>
       points.map((point) => `${point.x},${point.y}`).join(" ");
+    const alpha = assemblyPatternAlpha(faceColor);
+    const faces = [
+      {
+        id: "right",
+        points: [backBottomRight, frontBottomRight, frontTopRight, backTopRight],
+        fill: colorWithAlpha(tintColor(faceColor, -0.12), alpha),
+      },
+      {
+        id: "top",
+        points: [backBottomLeft, backBottomRight, backTopRight, backTopLeft],
+        fill: colorWithAlpha(tintColor(faceColor, 0.08), alpha),
+      },
+      {
+        id: "back",
+        points: [frontTopLeft, frontTopRight, backTopRight, backTopLeft],
+        fill: colorWithAlpha(tintColor(faceColor, 0.2), alpha),
+      },
+    ];
 
     return (
       <g key={key}>
-        <polygon
-          points={facePoints([backTopLeft, backTopRight, frontTopRight, frontTopLeft])}
-          fill={tintColor(faceColor, 0.2)}
-          stroke={edgeColor}
-          strokeWidth={materialStrokeWidth}
-        />
-        <polygon
-          points={facePoints([backBottomRight, frontBottomRight, frontTopRight, backTopRight])}
-          fill={tintColor(faceColor, -0.14)}
-          stroke={edgeColor}
-          strokeWidth={materialStrokeWidth}
-        />
-        <polygon
-          points={facePoints([frontBottomLeft, frontBottomRight, frontTopRight, frontTopLeft])}
-          fill={faceColor}
-          stroke={edgeColor}
-          strokeWidth={materialStrokeWidth}
-        />
+        {faces.map((face) => (
+          <polygon
+            key={`${key}-${face.id}`}
+            points={facePoints(face.points)}
+            fill={face.fill}
+            stroke={edgeColor}
+            strokeWidth={materialStrokeWidth}
+          />
+        ))}
       </g>
     );
   };
@@ -1304,9 +1380,13 @@ function PreviewCanvas({
             />
             <rect
               x={x(inputs.depth - BOARD_THICKNESS)}
-              y={yBottom(isTopSurface ? inputs.height - BOARD_THICKNESS : inputs.height)}
+              y={yBottom(
+                isTopSurface
+                  ? inputs.height - BOARD_THICKNESS
+                  : rearLegBaseHeight + rearLegVisibleHeight,
+              )}
               width={BOARD_THICKNESS * scale}
-              height={(isTopSurface ? inputs.height - BOARD_THICKNESS : inputs.height) * scale}
+              height={(isTopSurface ? inputs.height - BOARD_THICKNESS : rearLegVisibleHeight) * scale}
               fill={legFill}
               stroke={legLineColor}
               strokeWidth={materialStrokeWidth}
@@ -1473,39 +1553,23 @@ function PreviewCanvas({
 
         {viewMode === "assembly" ? (
           <>
-            {frameLeftPositions.map((left, index) => (
-              <g key={`assembly-frame-${index}`}>
-                {renderPrism(
-                  `assembly-back-leg-${index}`,
-                  {
-                    x: left,
-                    y: 0,
-                    z: 0,
-                    width: BOARD_WIDTH,
-                    height: visibleLegHeight,
-                    depth: BOARD_THICKNESS,
-                  },
-                  index === 0 || index === frameCount - 1 ? legColor : supportColor,
-                  index === 0 || index === frameCount - 1 ? legLineColor : supportLineColor,
-                )}
-                {renderPrism(
-                  `assembly-front-leg-${index}`,
-                  {
-                    x: left,
-                    y: 0,
-                    z: inputs.depth - BOARD_THICKNESS,
-                    width: BOARD_WIDTH,
-                    height: visibleLegHeight,
-                    depth: BOARD_THICKNESS,
-                  },
-                  index === 0 || index === frameCount - 1 ? legColor : supportColor,
-                  index === 0 || index === frameCount - 1 ? legLineColor : supportLineColor,
-                )}
-              </g>
-            ))}
-
             {isTopSurface ? (
               <>
+                {frameLeftPositions.map((left, index) =>
+                  renderPrism(
+                    `assembly-back-leg-${index}`,
+                    {
+                      x: left,
+                      y: 0,
+                      z: inputs.depth - BOARD_THICKNESS,
+                      width: BOARD_WIDTH,
+                      height: assemblyLegHeight,
+                      depth: BOARD_THICKNESS,
+                    },
+                    index === 0 || index === frameCount - 1 ? legColor : supportColor,
+                    index === 0 || index === frameCount - 1 ? legLineColor : supportLineColor,
+                  ),
+                )}
                 {frameLeftPositions.map((left, index) => (
                   <g key={`assembly-bench-rails-${index}`}>
                     {renderPrism(
@@ -1536,7 +1600,22 @@ function PreviewCanvas({
                     )}
                   </g>
                 ))}
-                {topBoardSideOffsets.map((offset, boardIndex) =>
+                {frameLeftPositions.map((left, index) =>
+                  renderPrism(
+                    `assembly-front-leg-${index}`,
+                    {
+                      x: left,
+                      y: 0,
+                      z: 0,
+                      width: BOARD_WIDTH,
+                      height: assemblyLegHeight,
+                      depth: BOARD_THICKNESS,
+                    },
+                    index === 0 || index === frameCount - 1 ? legColor : supportColor,
+                    index === 0 || index === frameCount - 1 ? legLineColor : supportLineColor,
+                  ),
+                )}
+                {[...topBoardSideOffsets].reverse().map((offset, boardIndex) =>
                   renderPrism(
                     `assembly-top-board-${boardIndex}`,
                     {
@@ -1554,40 +1633,82 @@ function PreviewCanvas({
               </>
             ) : (
               <>
-                {levelBottoms.flatMap((bottom, levelIndex) =>
-                  frameLeftPositions.map((left, frameIndex) =>
-                    renderPrism(
-                      `assembly-shelf-rail-${levelIndex}-${frameIndex}`,
-                      {
-                        x: left,
-                        y: bottom + BOARD_THICKNESS,
-                        z: BOARD_THICKNESS,
-                        width: BOARD_WIDTH,
-                        height: BOARD_THICKNESS,
-                        depth: inputs.depth - 2 * BOARD_THICKNESS,
-                      },
-                      railColor,
-                      railLineColor,
-                    ),
-                  ),
-                )}
-                {levelBottoms.flatMap((bottom, levelIndex) =>
-                  shelfBoardOffsets.map((offset, boardIndex) =>
-                    renderPrism(
-                      `assembly-shelf-board-${levelIndex}-${boardIndex}`,
-                      {
-                        x: 0,
-                        y: bottom + 2 * BOARD_THICKNESS,
-                        z: offset,
-                        width: inputs.length,
-                        height: BOARD_THICKNESS,
-                        depth: BOARD_WIDTH,
-                      },
-                      boardColor,
-                      boardLineColor,
-                    ),
-                  ),
-                )}
+                {(() => {
+                  const topLevelIndex = levelBottoms.length - 1;
+                  const renderShelfLevel = (bottom: number, levelIndex: number) => (
+                    <g key={`assembly-shelf-level-${levelIndex}`}>
+                      {frameLeftPositions.map((left, frameIndex) =>
+                        renderPrism(
+                          `assembly-shelf-rail-${levelIndex}-${frameIndex}`,
+                          {
+                            x: left,
+                            y: bottom + BOARD_THICKNESS,
+                            z: BOARD_THICKNESS,
+                            width: BOARD_WIDTH,
+                            height: BOARD_THICKNESS,
+                            depth: inputs.depth - 2 * BOARD_THICKNESS,
+                          },
+                          railColor,
+                          railLineColor,
+                        ),
+                      )}
+                      {[...shelfBoardOffsets].reverse().map((offset, boardIndex) =>
+                        renderPrism(
+                          `assembly-shelf-board-${levelIndex}-${boardIndex}`,
+                          {
+                            x: 0,
+                            y: bottom + 2 * BOARD_THICKNESS,
+                            z: offset,
+                            width: inputs.length,
+                            height: BOARD_THICKNESS,
+                            depth: BOARD_WIDTH,
+                          },
+                          boardColor,
+                          boardLineColor,
+                        ),
+                      )}
+                    </g>
+                  );
+
+                  return (
+                    <>
+                      {frameLeftPositions.map((left, index) =>
+                        renderPrism(
+                          `assembly-shelf-back-leg-${index}`,
+                          {
+                            x: left,
+                            y: rearLegBaseHeight,
+                            z: inputs.depth - BOARD_THICKNESS,
+                            width: BOARD_WIDTH,
+                            height: assemblyRearLegHeight,
+                            depth: BOARD_THICKNESS,
+                          },
+                          index === 0 || index === frameCount - 1 ? legColor : supportColor,
+                          index === 0 || index === frameCount - 1 ? legLineColor : supportLineColor,
+                        ),
+                      )}
+                      {levelBottoms
+                        .slice(0, Math.max(0, topLevelIndex))
+                        .map((bottom, levelIndex) => renderShelfLevel(bottom, levelIndex))}
+                      {topLevelIndex >= 0 ? renderShelfLevel(levelBottoms[topLevelIndex], topLevelIndex) : null}
+                      {frameLeftPositions.map((left, index) =>
+                        renderPrism(
+                          `assembly-shelf-front-leg-${index}`,
+                          {
+                            x: left,
+                            y: 0,
+                            z: 0,
+                            width: BOARD_WIDTH,
+                            height: assemblyLegHeight,
+                            depth: BOARD_THICKNESS,
+                          },
+                          index === 0 || index === frameCount - 1 ? legColor : supportColor,
+                          index === 0 || index === frameCount - 1 ? legLineColor : supportLineColor,
+                        ),
+                      )}
+                    </>
+                  );
+                })()}
               </>
             )}
           </>
