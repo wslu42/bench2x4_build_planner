@@ -4,7 +4,7 @@ export const STOCK_LENGTH = 96;
 export const SAW_KERF = 0.125;
 
 export type FurnitureType = "top-surface" | "shelving";
-export type ViewMode = "top" | "side" | "front";
+export type ViewMode = "top" | "side" | "front" | "assembly";
 
 export type CommonInputs = {
   length: number;

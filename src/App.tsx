@@ -407,7 +407,7 @@ function App() {
               </div>
 
               <div className="segmented">
-                {(["top", "side", "front"] as ViewMode[]).map((mode) => (
+                {(["top", "side", "front", "assembly"] as ViewMode[]).map((mode) => (
                   <button
                     key={mode}
                     type="button"
@@ -606,35 +606,49 @@ function App() {
                   </header>
                   <div className="board-visual" aria-label={`Board ${board.boardIndex} cut layout`}>
                     <div className="board-visual-track">
-                      {board.cuts.map((cut, index) => {
-                        const segmentStyle = stockSegmentStyles[cut.partKey] ?? {
-                          fill: "#d6c4b2",
-                          stroke: "#8b7357",
-                        };
-                        return (
-                          <div
-                            key={`${board.boardIndex}-${cut.partKey}-${index}`}
-                            className="board-visual-segment"
-                            style={{
-                              width: `${(cut.length / STOCK_LENGTH) * 100}%`,
-                              backgroundColor: segmentStyle.fill,
-                              borderColor: segmentStyle.stroke,
-                            }}
-                            title={`${cut.label} ${formatInches(cut.length)}`}
-                          >
-                            <span>{formatInches(cut.length)}</span>
-                          </div>
-                        );
-                      })}
-                      {board.waste > 0 ? (
-                        <div
-                          className="board-visual-segment board-visual-waste"
-                          style={{ width: `${(board.waste / STOCK_LENGTH) * 100}%` }}
-                          title={`Waste ${formatInches(board.waste)}`}
-                        >
-                          <span>{formatInches(board.waste)} waste</span>
-                        </div>
-                      ) : null}
+                        {board.cuts.map((cut, index) => {
+                          const segmentStyle = stockSegmentStyles[cut.partKey] ?? {
+                            fill: "#d6c4b2",
+                            stroke: "#8b7357",
+                          };
+                          const widthPercent = (cut.length / STOCK_LENGTH) * 100;
+                          const showSegmentLabel = widthPercent >= 10;
+                          return (
+                            <div
+                              key={`${board.boardIndex}-${cut.partKey}-${index}`}
+                              className="board-visual-segment"
+                              style={{
+                                width: `${widthPercent}%`,
+                                backgroundColor: segmentStyle.fill,
+                                borderColor: segmentStyle.stroke,
+                              }}
+                              title={`${cut.label} ${formatInches(cut.length)}`}
+                            >
+                              {showSegmentLabel ? <span>{formatInches(cut.length)}</span> : null}
+                            </div>
+                          );
+                        })}
+                        {board.waste > 0 ? (
+                          (() => {
+                            const wastePercent = (board.waste / STOCK_LENGTH) * 100;
+                            let wasteLabel: string | null = null;
+                            if (wastePercent >= 16) {
+                              wasteLabel = `${formatInches(board.waste)} waste`;
+                            } else if (wastePercent >= 10) {
+                              wasteLabel = formatInches(board.waste);
+                            }
+
+                            return (
+                              <div
+                                className="board-visual-segment board-visual-waste"
+                                style={{ width: `${wastePercent}%` }}
+                                title={`Waste ${formatInches(board.waste)}`}
+                              >
+                                {wasteLabel ? <span>{wasteLabel}</span> : null}
+                              </div>
+                            );
+                          })()
+                        ) : null}
                     </div>
                   </div>
                   <small>
@@ -871,8 +885,18 @@ function PreviewCanvas({
       ? Math.max(1, Math.floor(inputs.depth / BOARD_WIDTH))
       : Math.max(1, Math.floor((inputs.depth - 2 * BOARD_THICKNESS) / BOARD_WIDTH));
 
-  const viewWidth = viewMode === "side" ? inputs.depth : inputs.length;
-  const viewHeight = viewMode === "top" ? inputs.depth : inputs.height;
+  const viewWidth =
+    viewMode === "side"
+      ? inputs.depth
+      : viewMode === "assembly"
+        ? inputs.length + inputs.depth * 0.72
+        : inputs.length;
+  const viewHeight =
+    viewMode === "top"
+      ? inputs.depth
+      : viewMode === "assembly"
+        ? inputs.height + inputs.depth * 0.44 + BOARD_THICKNESS
+        : inputs.height;
   const scale = Math.min(annotationFrameWidth / viewWidth, annotationFrameHeight / viewHeight);
   const contentWidth = viewWidth * scale;
   const contentHeight = viewHeight * scale;
@@ -1047,6 +1071,63 @@ function PreviewCanvas({
       xx
     </text>
   );
+
+  const tintColor = (hex: string, amount: number) => {
+    const value = hex.replace("#", "");
+    const [r, g, b] = [0, 2, 4].map((index) => parseInt(value.slice(index, index + 2), 16));
+    const mix = (channel: number) =>
+      Math.max(0, Math.min(255, Math.round(channel + (amount >= 0 ? (255 - channel) * amount : channel * amount))));
+    return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+  };
+
+  const assemblySkewX = 0.52;
+  const assemblySkewY = 0.28;
+  const assemblyProject = (px: number, py: number, pz: number) => ({
+    x: originX + (px + pz * assemblySkewX) * scale,
+    y: originY + contentHeight - py * scale - pz * assemblySkewY * scale,
+  });
+
+  const renderPrism = (
+    key: string,
+    prism: { x: number; y: number; z: number; width: number; height: number; depth: number },
+    faceColor: string,
+    edgeColor: string,
+  ) => {
+    const frontBottomLeft = assemblyProject(prism.x, prism.y, prism.z + prism.depth);
+    const frontBottomRight = assemblyProject(prism.x + prism.width, prism.y, prism.z + prism.depth);
+    const frontTopLeft = assemblyProject(prism.x, prism.y + prism.height, prism.z + prism.depth);
+    const frontTopRight = assemblyProject(prism.x + prism.width, prism.y + prism.height, prism.z + prism.depth);
+    const backBottomLeft = assemblyProject(prism.x, prism.y, prism.z);
+    const backBottomRight = assemblyProject(prism.x + prism.width, prism.y, prism.z);
+    const backTopLeft = assemblyProject(prism.x, prism.y + prism.height, prism.z);
+    const backTopRight = assemblyProject(prism.x + prism.width, prism.y + prism.height, prism.z);
+
+    const facePoints = (points: { x: number; y: number }[]) =>
+      points.map((point) => `${point.x},${point.y}`).join(" ");
+
+    return (
+      <g key={key}>
+        <polygon
+          points={facePoints([backTopLeft, backTopRight, frontTopRight, frontTopLeft])}
+          fill={tintColor(faceColor, 0.2)}
+          stroke={edgeColor}
+          strokeWidth={materialStrokeWidth}
+        />
+        <polygon
+          points={facePoints([backBottomRight, frontBottomRight, frontTopRight, backTopRight])}
+          fill={tintColor(faceColor, -0.14)}
+          stroke={edgeColor}
+          strokeWidth={materialStrokeWidth}
+        />
+        <polygon
+          points={facePoints([frontBottomLeft, frontBottomRight, frontTopRight, frontTopLeft])}
+          fill={faceColor}
+          stroke={edgeColor}
+          strokeWidth={materialStrokeWidth}
+        />
+      </g>
+    );
+  };
 
   return (
     <div className="preview-canvas">
@@ -1387,6 +1468,128 @@ function PreviewCanvas({
                 textAnchor="start"
               />
             ) : null}
+          </>
+        ) : null}
+
+        {viewMode === "assembly" ? (
+          <>
+            {frameLeftPositions.map((left, index) => (
+              <g key={`assembly-frame-${index}`}>
+                {renderPrism(
+                  `assembly-back-leg-${index}`,
+                  {
+                    x: left,
+                    y: 0,
+                    z: 0,
+                    width: BOARD_WIDTH,
+                    height: visibleLegHeight,
+                    depth: BOARD_THICKNESS,
+                  },
+                  index === 0 || index === frameCount - 1 ? legColor : supportColor,
+                  index === 0 || index === frameCount - 1 ? legLineColor : supportLineColor,
+                )}
+                {renderPrism(
+                  `assembly-front-leg-${index}`,
+                  {
+                    x: left,
+                    y: 0,
+                    z: inputs.depth - BOARD_THICKNESS,
+                    width: BOARD_WIDTH,
+                    height: visibleLegHeight,
+                    depth: BOARD_THICKNESS,
+                  },
+                  index === 0 || index === frameCount - 1 ? legColor : supportColor,
+                  index === 0 || index === frameCount - 1 ? legLineColor : supportLineColor,
+                )}
+              </g>
+            ))}
+
+            {isTopSurface ? (
+              <>
+                {frameLeftPositions.map((left, index) => (
+                  <g key={`assembly-bench-rails-${index}`}>
+                    {renderPrism(
+                      `assembly-top-rail-${index}`,
+                      {
+                        x: left,
+                        y: inputs.height - 2 * BOARD_THICKNESS,
+                        z: BOARD_THICKNESS,
+                        width: BOARD_WIDTH,
+                        height: BOARD_THICKNESS,
+                        depth: inputs.depth - 2 * BOARD_THICKNESS,
+                      },
+                      railColor,
+                      railLineColor,
+                    )}
+                    {renderPrism(
+                      `assembly-bottom-rail-${index}`,
+                      {
+                        x: left,
+                        y: bottomRailBottom,
+                        z: BOARD_THICKNESS,
+                        width: BOARD_WIDTH,
+                        height: BOARD_THICKNESS,
+                        depth: inputs.depth - 2 * BOARD_THICKNESS,
+                      },
+                      railColor,
+                      railLineColor,
+                    )}
+                  </g>
+                ))}
+                {topBoardSideOffsets.map((offset, boardIndex) =>
+                  renderPrism(
+                    `assembly-top-board-${boardIndex}`,
+                    {
+                      x: 0,
+                      y: inputs.height - BOARD_THICKNESS,
+                      z: offset,
+                      width: inputs.length,
+                      height: BOARD_THICKNESS,
+                      depth: BOARD_WIDTH,
+                    },
+                    boardColor,
+                    boardLineColor,
+                  ),
+                )}
+              </>
+            ) : (
+              <>
+                {levelBottoms.flatMap((bottom, levelIndex) =>
+                  frameLeftPositions.map((left, frameIndex) =>
+                    renderPrism(
+                      `assembly-shelf-rail-${levelIndex}-${frameIndex}`,
+                      {
+                        x: left,
+                        y: bottom + BOARD_THICKNESS,
+                        z: BOARD_THICKNESS,
+                        width: BOARD_WIDTH,
+                        height: BOARD_THICKNESS,
+                        depth: inputs.depth - 2 * BOARD_THICKNESS,
+                      },
+                      railColor,
+                      railLineColor,
+                    ),
+                  ),
+                )}
+                {levelBottoms.flatMap((bottom, levelIndex) =>
+                  shelfBoardOffsets.map((offset, boardIndex) =>
+                    renderPrism(
+                      `assembly-shelf-board-${levelIndex}-${boardIndex}`,
+                      {
+                        x: 0,
+                        y: bottom + 2 * BOARD_THICKNESS,
+                        z: offset,
+                        width: inputs.length,
+                        height: BOARD_THICKNESS,
+                        depth: BOARD_WIDTH,
+                      },
+                      boardColor,
+                      boardLineColor,
+                    ),
+                  ),
+                )}
+              </>
+            )}
           </>
         ) : null}
 

@@ -273,7 +273,8 @@ select {
 
 .preview-canvas {
   margin-top: 24px;
-  position: relative;
+  display: grid;
+  gap: 10px;
 }
 
 .preview-canvas svg {
@@ -283,10 +284,6 @@ select {
 }
 
 .preview-legend {
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: 12px;
   display: flex;
   flex-wrap: wrap;
   gap: 10px 16px;
@@ -795,5 +792,267 @@ th {
   .field,
   .field-compact {
     max-width: 240px;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    padding: 18px;
+  }
+
+  .app-header {
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .eyebrow {
+    margin-bottom: 4px;
+    font-size: 0.76rem;
+  }
+
+  .app-header h1 {
+    font-size: clamp(1.9rem, 11vw, 2.6rem);
+    max-width: none;
+  }
+
+  .panel-controls,
+  .panel-preview,
+  .panel-results,
+  .panel-gallery {
+    padding: 18px;
+  }
+
+  .panel-section-header,
+  .panel-header-row,
+  .gallery-card-header {
+    flex-direction: column;
+    align-items: start;
+  }
+
+  .preview-controls,
+  .gallery-card-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .segmented {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
+  .segmented button {
+    padding: 9px 12px;
+  }
+
+  .segmented-mode {
+    width: 100%;
+  }
+
+  .segmented-mode button {
+    flex: 1 1 140px;
+  }
+
+  .field-grid {
+    grid-template-columns: 1fr;
+    gap: 10px 12px;
+  }
+
+  .field,
+  .field-compact {
+    max-width: none;
+  }
+
+  .panel-controls .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  th,
+  td {
+    font-size: 0.88rem;
+  }
+
+  .shopping-table {
+    table-layout: fixed;
+  }
+
+  .shopping-table th:nth-child(1),
+  .shopping-table td:nth-child(1) {
+    width: 24%;
+  }
+
+  .shopping-table th:nth-child(2),
+  .shopping-table td:nth-child(2) {
+    width: 20%;
+  }
+
+  .shopping-table th:nth-child(3),
+  .shopping-table td:nth-child(3) {
+    width: 30%;
+  }
+
+  .shopping-table th:nth-child(4),
+  .shopping-table td:nth-child(4) {
+    width: 10%;
+  }
+
+  .shopping-table th:nth-child(5),
+  .shopping-table td:nth-child(5) {
+    width: 16%;
+  }
+
+  .shopping-total-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .shopping-total-label {
+    grid-column: 1;
+  }
+
+  .shopping-total-spacer {
+    display: none;
+  }
+
+  .shopping-total-row strong {
+    grid-column: 2;
+    justify-self: start;
+    min-width: 0;
+  }
+
+  .preview-canvas {
+    margin-top: 18px;
+  }
+
+  .preview-legend {
+    gap: 8px 12px;
+    padding: 0 4px;
+  }
+
+  .preview-legend-item {
+    font-size: 0.78rem;
+  }
+
+  .board-card {
+    padding: 12px;
+  }
+
+  .board-card header {
+    flex-direction: column;
+    align-items: start;
+  }
+
+  .board-card-title {
+    gap: 6px;
+  }
+
+  .board-card-title span {
+    margin-left: 0;
+    font-size: 0.76rem;
+  }
+
+  .board-optimization-legend {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+    gap: 8px 12px;
+    font-size: 0.75rem;
+  }
+
+  .board-visual-segment {
+    padding: 3px 1px;
+    font-size: 0.64rem;
+  }
+
+  .board-visual-segment span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .gallery-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gallery-image {
+    height: 180px;
+  }
+
+  .gallery-lightbox {
+    padding: 16px;
+  }
+
+  .gallery-lightbox-panel {
+    padding: 16px;
+  }
+
+  .gallery-lightbox-header {
+    gap: 10px;
+  }
+
+  .gallery-lightbox-caption {
+    font-size: 1.05rem;
+  }
+}
+
+@media (max-width: 430px) {
+  .app-shell {
+    padding: 14px;
+  }
+
+  .app-header h1 {
+    font-size: clamp(1.75rem, 10vw, 2.3rem);
+    line-height: 1;
+  }
+
+  .panel-controls,
+  .panel-preview,
+  .panel-results,
+  .panel-gallery {
+    padding: 16px;
+  }
+
+  .panel-controls .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .shopping-table th,
+  .shopping-table td {
+    font-size: 0.82rem;
+  }
+
+  .shopping-table th:nth-child(1),
+  .shopping-table td:nth-child(1) {
+    width: 22%;
+  }
+
+  .shopping-table th:nth-child(2),
+  .shopping-table td:nth-child(2) {
+    width: 18%;
+  }
+
+  .shopping-table th:nth-child(3),
+  .shopping-table td:nth-child(3) {
+    width: 29%;
+  }
+
+  .shopping-table th:nth-child(4),
+  .shopping-table td:nth-child(4) {
+    width: 11%;
+  }
+
+  .shopping-table th:nth-child(5),
+  .shopping-table td:nth-child(5) {
+    width: 20%;
+  }
+
+  .preview-legend {
+    gap: 6px 10px;
+  }
+
+  .preview-legend-item {
+    font-size: 0.74rem;
+  }
+
+  .board-visual-segment {
+    font-size: 0.6rem;
   }
 }
