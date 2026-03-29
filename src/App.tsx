@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   BOARD_THICKNESS,
   BOARD_WIDTH,
@@ -126,6 +126,41 @@ function App() {
       ? `Top boards derived from outer depth: ${design.boardCountPerLevel}`
       : `Shelf boards per level derived from inner depth: ${design.boardCountPerLevel}`,
   ];
+
+  useEffect(() => {
+    if (length !== effectiveInputs.length) {
+      setLength(effectiveInputs.length);
+    }
+
+    if (depth !== effectiveInputs.depth) {
+      setDepth(effectiveInputs.depth);
+    }
+
+    if (height !== effectiveInputs.height) {
+      setHeight(effectiveInputs.height);
+    }
+
+    if (maxSpan !== effectiveInputs.maxSpan) {
+      setMaxSpan(effectiveInputs.maxSpan);
+    }
+
+    if (bottomRailClearance !== effectiveInputs.bottomRailClearance) {
+      setBottomRailClearance(effectiveInputs.bottomRailClearance);
+    }
+
+    if (!isTopSurface && shelfLevelCount !== effectiveInputs.shelfLevelCount) {
+      setShelfLevelCount(effectiveInputs.shelfLevelCount);
+    }
+  }, [
+    bottomRailClearance,
+    depth,
+    effectiveInputs,
+    height,
+    isTopSurface,
+    length,
+    maxSpan,
+    shelfLevelCount,
+  ]);
 
   return (
     <div className="app-shell">
@@ -715,6 +750,8 @@ function PreviewCanvas({
   const topBoardSideOffsets = Array.from({ length: boardCount }, (_, index) => {
     return index * (BOARD_WIDTH + topBoardGap);
   });
+  const sameLevelBoardGap = isTopSurface ? topBoardGap : boardGap;
+  const sameLevelBoardOffsets = isTopSurface ? topBoardSideOffsets : shelfBoardOffsets;
 
   const frameLeftPositions = framePositions;
   const frontFramePositions = framePositions;
@@ -732,6 +769,10 @@ function PreviewCanvas({
           return firstBottom + step * index;
         })
       : [];
+  const levelGap =
+    !isTopSurface && levelBottoms.length > 1
+      ? Math.max(0, levelBottoms[1] - (levelBottoms[0] + 2 * BOARD_THICKNESS))
+      : 0;
 
   const screwColor = "#5f2f1f";
   const legendItems = isTopSurface
@@ -1042,13 +1083,24 @@ function PreviewCanvas({
               </>
             )}
 
+            {sameLevelBoardGap > 0.001 && sameLevelBoardOffsets.length > 1 ? (
+              <DimensionLine
+                x1={x(sameLevelBoardOffsets[0] + BOARD_WIDTH)}
+                y1={Math.max(capsuleY + 26, yBottom(inputs.height) - 18)}
+                x2={x(sameLevelBoardOffsets[1])}
+                y2={Math.max(capsuleY + 26, yBottom(inputs.height) - 18)}
+                label={`Board Gap ${formatInches(sameLevelBoardGap)}`}
+                textY={Math.max(capsuleY + 16, yBottom(inputs.height) - 28)}
+              />
+            ) : null}
+
             <DimensionLine
               x1={x(0)}
-              y1={lowerFarDimY}
+              y1={showClearSpanDimension ? lowerFarDimY + 28 : lowerFarDimY}
               x2={xRight}
-              y2={lowerFarDimY}
+              y2={showClearSpanDimension ? lowerFarDimY + 28 : lowerFarDimY}
               label={`Depth ${formatInches(inputs.depth)}`}
-              textY={lowerFarDimTextY}
+              textY={showClearSpanDimension ? lowerFarDimTextY + 28 : lowerFarDimTextY}
             />
             <DimensionLine
               x1={leftDimX}
@@ -1062,11 +1114,11 @@ function PreviewCanvas({
             />
             <DimensionLine
               x1={x(BOARD_THICKNESS)}
-              y1={lowerNearDimY}
+              y1={showClearSpanDimension ? lowerNearDimY + 28 : lowerNearDimY}
               x2={x(inputs.depth - BOARD_THICKNESS)}
-              y2={lowerNearDimY}
+              y2={showClearSpanDimension ? lowerNearDimY + 28 : lowerNearDimY}
               label={`Rail ${formatInches(inputs.depth - 2 * BOARD_THICKNESS)}`}
-              textY={lowerNearDimTextY}
+              textY={showClearSpanDimension ? lowerNearDimTextY + 28 : lowerNearDimTextY}
             />
             <DimensionLine
               x1={rightDimX}
@@ -1078,6 +1130,18 @@ function PreviewCanvas({
               textY={yBottom(bottomRailBottom / 2) - 10}
               textAnchor="start"
             />
+            {!isTopSurface && levelGap > 0.001 ? (
+              <DimensionLine
+                x1={Math.min(capsuleX + capsuleWidth - 24, rightDimX + 40)}
+                y1={yBottom(levelBottoms[0] + 2 * BOARD_THICKNESS)}
+                x2={Math.min(capsuleX + capsuleWidth - 24, rightDimX + 40)}
+                y2={yBottom(levelBottoms[1])}
+                label={`Level Gap ${formatInches(levelGap)}`}
+                textX={Math.min(capsuleX + capsuleWidth - 12, rightDimX + 52)}
+                textY={(yBottom(levelBottoms[0] + 2 * BOARD_THICKNESS) + yBottom(levelBottoms[1])) / 2 - 10}
+                textAnchor="start"
+              />
+            ) : null}
           </>
         ) : null}
 
