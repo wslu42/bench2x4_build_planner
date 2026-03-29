@@ -91,6 +91,10 @@ select {
   align-items: start;
 }
 
+.gallery-layout {
+  display: block;
+}
+
 .panel {
   background: rgba(255, 252, 248, 0.88);
   border: 1px solid rgba(154, 120, 87, 0.18);
@@ -105,6 +109,10 @@ select {
 }
 
 .panel-preview {
+  padding: 24px;
+}
+
+.panel-gallery {
   padding: 24px;
 }
 
@@ -257,6 +265,10 @@ select {
   background: #fffdf8;
   color: #2f241c;
   box-shadow: 0 4px 14px rgba(83, 51, 22, 0.1);
+}
+
+.app-mode-toggle {
+  flex: 0 0 auto;
 }
 
 .preview-canvas {
@@ -568,6 +580,100 @@ th {
   grid-column: 5;
   justify-self: start;
   font-size: 1.1rem;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.gallery-card {
+  overflow: hidden;
+  border-radius: 24px;
+  background: #fff7ed;
+  border: 1px solid rgba(154, 120, 87, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.gallery-image {
+  height: 210px;
+  border-bottom: 1px solid rgba(154, 120, 87, 0.12);
+  background-size: cover;
+  background-position: center;
+  background-color: #ead8c4;
+}
+
+.gallery-card-body {
+  padding: 18px 18px 20px;
+}
+
+.gallery-card-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.gallery-card-eyebrow {
+  margin: 0 0 4px;
+  color: #8c5a2b;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.gallery-card h3 {
+  margin: 0;
+}
+
+.gallery-chip {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #f3e2ce;
+  color: #6f4a29;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.gallery-card-description {
+  margin: 12px 0 14px;
+  color: #6f5640;
+}
+
+.gallery-meta {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.gallery-meta li {
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: #fff3e4;
+  color: #6b4f36;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.gallery-load-button {
+  border: 0;
+  background: #2f241c;
+  color: #fffaf1;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gallery-load-button:hover {
+  background: #4a3628;
 }
 
 @media (max-width: 1180px) {

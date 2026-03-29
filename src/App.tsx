@@ -11,9 +11,23 @@ import {
   deriveFrameLayout,
   formatInches,
 } from "./domain";
+import entryBenchImage from "./gallery_asset/entry_bench_L24_D14_H19.jpg";
+import longBenchImage from "./gallery_asset/long_bench_L60_D14_H17p5.jpg";
+import threeTierShelfImage from "./gallery_asset/three_tier_shelf_L33_D17p5_H92.jpg";
+import twoTierShelfImage from "./gallery_asset/two_tier_shelf_L51_D17p5_H92.jpg";
 
 type FillMode = "solid" | "pattern";
 type ColorTheme = "rainbow" | "pinkblue" | "neon" | "sunset" | "violet";
+type PageMode = "planner" | "gallery";
+
+type GalleryBuild = {
+  id: string;
+  title: string;
+  category: "Bench" | "Shelving";
+  description: string;
+  imageSrc: string;
+  inputs: AppInputs;
+};
 
 type FieldProps = {
   label: string;
@@ -41,7 +55,73 @@ function NumberField({ label, value, min, step = 0.5, onChange }: FieldProps) {
 const DEFAULT_BOARD_UNIT_PRICE = 4.15;
 const DEFAULT_SCREW_UNIT_PRICE = 0.06;
 
+const GALLERY_BUILDS: GalleryBuild[] = [
+  {
+    id: "entry-bench",
+    title: "Entry Bench",
+    category: "Bench",
+    description: "Compact hallway bench with a simple open base and generous clearance.",
+    imageSrc: entryBenchImage,
+    inputs: {
+      furnitureType: "top-surface",
+      length: 24,
+      depth: 14,
+      height: 19,
+      maxSpan: 44,
+      bottomRailClearance: 6,
+    },
+  },
+  {
+    id: "long-bench",
+    title: "Long Bench",
+    category: "Bench",
+    description: "Longer seating span with one extra support frame to reduce flex.",
+    imageSrc: longBenchImage,
+    inputs: {
+      furnitureType: "top-surface",
+      length: 60,
+      depth: 14,
+      height: 17.5,
+      maxSpan: 44,
+      bottomRailClearance: 6,
+    },
+  },
+  {
+    id: "two-tier-shelf",
+    title: "Two-Tier Shelf",
+    category: "Shelving",
+    description: "Open shelving preset for entry or workshop storage with comfortable lower clearance.",
+    imageSrc: twoTierShelfImage,
+    inputs: {
+      furnitureType: "shelving",
+      length: 51,
+      depth: 17.5,
+      height: 92,
+      maxSpan: 44,
+      bottomRailClearance: 6,
+      shelfLevelCount: 2,
+    },
+  },
+  {
+    id: "three-tier-shelf",
+    title: "Three-Tier Shelf",
+    category: "Shelving",
+    description: "Denser storage layout that still respects the fixed 2x4 frame system.",
+    imageSrc: threeTierShelfImage,
+    inputs: {
+      furnitureType: "shelving",
+      length: 33,
+      depth: 17.5,
+      height: 92,
+      maxSpan: 44,
+      bottomRailClearance: 6,
+      shelfLevelCount: 3,
+    },
+  },
+];
+
 function App() {
+  const [pageMode, setPageMode] = useState<PageMode>("planner");
   const [furnitureType, setFurnitureType] = useState<FurnitureType>("top-surface");
   const [viewMode, setViewMode] = useState<ViewMode>("side");
   const [length, setLength] = useState(72);
@@ -66,6 +146,20 @@ function App() {
     setHeight(44);
     setMaxSpan(44);
     setBottomRailClearance(6);
+  };
+
+  const applyBuildPreset = (presetInputs: AppInputs) => {
+    setFurnitureType(presetInputs.furnitureType);
+    setLength(presetInputs.length);
+    setDepth(presetInputs.depth);
+    setHeight(presetInputs.height);
+    setMaxSpan(presetInputs.maxSpan);
+    setBottomRailClearance(presetInputs.bottomRailClearance);
+    setShelfLevelCount(
+      presetInputs.furnitureType === "shelving" ? presetInputs.shelfLevelCount : 3,
+    );
+    setViewMode("side");
+    setPageMode("planner");
   };
 
   const inputs: AppInputs = useMemo(() => {
@@ -169,8 +263,24 @@ function App() {
           <p className="eyebrow">JustUse2x4</p>
           <h1>Fixed 2x4 furniture preview and cut planner</h1>
         </div>
+        <div className="segmented app-mode-toggle" aria-label="Page">
+          {([
+            { value: "planner", label: "Planner" },
+            { value: "gallery", label: "Gallery" },
+          ] as const).map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={pageMode === option.value ? "active" : ""}
+              onClick={() => setPageMode(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </header>
 
+      {pageMode === "planner" ? (
       <main className="workspace">
         <aside className="panel panel-controls">
           <section className="panel-section">
@@ -534,6 +644,66 @@ function App() {
           </section>
         </aside>
       </main>
+      ) : (
+        <main className="gallery-layout">
+          <section className="panel panel-gallery">
+            <section className="panel-section">
+              <div className="panel-section-header">
+                <h2>Build Gallery</h2>
+              </div>
+              <p className="muted">
+                Example builds that use the same fixed 2x4 system. Pick one to load its parameters
+                into the planner.
+              </p>
+            </section>
+
+            <section className="gallery-grid">
+              {GALLERY_BUILDS.map((build) => {
+                const buildInputs = build.inputs;
+                const shelfLevelsLabel =
+                  buildInputs.furnitureType === "shelving"
+                    ? `Levels ${buildInputs.shelfLevelCount}`
+                    : null;
+
+                return (
+                  <article key={build.id} className="gallery-card">
+                    <div
+                      className="gallery-image"
+                      aria-hidden="true"
+                      style={{ backgroundImage: `url(${build.imageSrc})` }}
+                    />
+                    <div className="gallery-card-body">
+                      <div className="gallery-card-header">
+                        <div>
+                          <p className="gallery-card-eyebrow">{build.category}</p>
+                          <h3>{build.title}</h3>
+                        </div>
+                        <span className="gallery-chip">{build.category}</span>
+                      </div>
+                      <p className="gallery-card-description">{build.description}</p>
+                      <ul className="gallery-meta">
+                        <li>{`L ${formatInches(buildInputs.length)}`}</li>
+                        <li>{`D ${formatInches(buildInputs.depth)}`}</li>
+                        <li>{`H ${formatInches(buildInputs.height)}`}</li>
+                        <li>{`Max Span ${formatInches(buildInputs.maxSpan)}`}</li>
+                        <li>{`Clearance ${formatInches(buildInputs.bottomRailClearance)}`}</li>
+                        {shelfLevelsLabel ? <li>{shelfLevelsLabel}</li> : null}
+                      </ul>
+                      <button
+                        type="button"
+                        className="gallery-load-button"
+                        onClick={() => applyBuildPreset(build.inputs)}
+                      >
+                        Load This Build
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </section>
+          </section>
+        </main>
+      )}
     </div>
   );
 }
