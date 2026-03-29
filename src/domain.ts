@@ -55,6 +55,7 @@ export type StockBoardPlan = {
 };
 
 export type DerivedDesign = {
+  normalizedInputs: AppInputs;
   frameCount: number;
   extraSupportHFrameCount: number;
   framePositions: number[];
@@ -70,6 +71,22 @@ export type DerivedDesign = {
   totalWaste: number;
   totalUsedLength: number;
 };
+
+function clampNumber(value: number, min: number) {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.max(value, min);
+}
+
+function roundShelfLevels(value: number) {
+  if (!Number.isFinite(value)) {
+    return 1;
+  }
+
+  return Math.max(1, Math.round(value));
+}
 
 export function deriveFrameLayout(length: number, maxSpan: number) {
   const safeLength = Math.max(length, BOARD_WIDTH * 2);
@@ -152,34 +169,119 @@ function optimizeStock(parts: Part[]): StockBoardPlan[] {
 }
 
 export function deriveDesign(inputs: AppInputs): DerivedDesign {
+  const issues: string[] = [];
+  const safeLength = clampNumber(inputs.length, BOARD_WIDTH * 2);
+  const minDepth =
+    inputs.furnitureType === "shelving"
+      ? 2 * BOARD_THICKNESS + BOARD_WIDTH
+      : 2 * BOARD_THICKNESS + 0.5;
+  const safeDepth = clampNumber(inputs.depth, minDepth);
+  const minHeight = inputs.furnitureType === "top-surface" ? 3 * BOARD_THICKNESS : 2 * BOARD_THICKNESS;
+  const safeHeight = clampNumber(inputs.height, minHeight);
+  const safeMaxSpan = clampNumber(inputs.maxSpan, 1);
+  const roundedShelfLevelCount =
+    inputs.furnitureType === "shelving" ? roundShelfLevels(inputs.shelfLevelCount) : 1;
+  const maxFeasibleShelfLevels =
+    inputs.furnitureType === "shelving" ? Math.max(1, Math.floor(safeHeight / (2 * BOARD_THICKNESS))) : 1;
+  const safeShelfLevelCount =
+    inputs.furnitureType === "shelving"
+      ? Math.min(roundedShelfLevelCount, maxFeasibleShelfLevels)
+      : 1;
+
+  const baseBottomRailClearance = clampNumber(inputs.bottomRailClearance, 0);
+  const maxBottomRailClearance =
+    inputs.furnitureType === "top-surface"
+      ? Math.max(0, safeHeight - 3 * BOARD_THICKNESS)
+      : safeShelfLevelCount <= 1
+        ? Math.max(0, safeHeight - 2 * BOARD_THICKNESS)
+        : Math.max(0, safeHeight - safeShelfLevelCount * 2 * BOARD_THICKNESS);
+  const safeBottomRailClearance = Math.min(baseBottomRailClearance, maxBottomRailClearance);
+
+  if (safeLength !== inputs.length) {
+    issues.push(
+      `Length was clamped to ${safeLength}" to keep the frame geometry valid.`,
+    );
+  }
+
+  if (safeDepth !== inputs.depth) {
+    issues.push(
+      `Depth was clamped to ${safeDepth}" to keep rail length and board layout valid.`,
+    );
+  }
+
+  if (safeHeight !== inputs.height) {
+    issues.push(
+      `Height was clamped to ${safeHeight}" to avoid impossible rail and leg geometry.`,
+    );
+  }
+
+  if (safeMaxSpan !== inputs.maxSpan) {
+    issues.push(`Max span was clamped to ${safeMaxSpan}".`);
+  }
+
+  if (inputs.furnitureType === "shelving" && roundedShelfLevelCount !== inputs.shelfLevelCount) {
+    issues.push(`Shelf levels were rounded to ${roundedShelfLevelCount}.`);
+  }
+
+  if (inputs.furnitureType === "shelving" && safeShelfLevelCount !== roundedShelfLevelCount) {
+    issues.push(
+      `Shelf levels were clamped to ${safeShelfLevelCount} for the current height.`,
+    );
+  }
+
+  if (safeBottomRailClearance !== inputs.bottomRailClearance) {
+    issues.push(
+      `Bottom rail clearance was clamped to ${safeBottomRailClearance}" for the current structure.`,
+    );
+  }
+
+  const normalizedInputs: AppInputs =
+    inputs.furnitureType === "top-surface"
+      ? {
+          furnitureType: "top-surface",
+          length: safeLength,
+          depth: safeDepth,
+          height: safeHeight,
+          maxSpan: safeMaxSpan,
+          bottomRailClearance: safeBottomRailClearance,
+        }
+      : {
+          furnitureType: "shelving",
+          length: safeLength,
+          depth: safeDepth,
+          height: safeHeight,
+          maxSpan: safeMaxSpan,
+          bottomRailClearance: safeBottomRailClearance,
+          shelfLevelCount: safeShelfLevelCount,
+        };
+
   const { frameCount, framePositions, actualClearSpan } = deriveFrameLayout(
-    inputs.length,
-    inputs.maxSpan,
+    normalizedInputs.length,
+    normalizedInputs.maxSpan,
   );
   const extraSupportHFrameCount = Math.max(0, frameCount - 2);
-  const sideRailLength = inputs.depth - 2 * BOARD_THICKNESS;
+  const sideRailLength = normalizedInputs.depth - 2 * BOARD_THICKNESS;
   const shelfLevelCount =
-    inputs.furnitureType === "shelving" ? inputs.shelfLevelCount : 1;
+    normalizedInputs.furnitureType === "shelving" ? normalizedInputs.shelfLevelCount : 1;
   const boardCountPerLevel =
-    inputs.furnitureType === "top-surface"
-      ? Math.max(1, Math.floor(inputs.depth / BOARD_WIDTH))
-      : Math.max(1, Math.floor((inputs.depth - 2 * BOARD_THICKNESS) / BOARD_WIDTH));
+    normalizedInputs.furnitureType === "top-surface"
+      ? Math.max(1, Math.floor(normalizedInputs.depth / BOARD_WIDTH))
+      : Math.max(1, Math.floor((normalizedInputs.depth - 2 * BOARD_THICKNESS) / BOARD_WIDTH));
   const legVerticalLength =
-    inputs.furnitureType === "top-surface"
-      ? inputs.height - BOARD_THICKNESS
-      : inputs.height;
-  const issues: string[] = [];
+    normalizedInputs.furnitureType === "top-surface"
+      ? normalizedInputs.height - BOARD_THICKNESS
+      : normalizedInputs.height;
 
-  if (inputs.furnitureType === "shelving") {
-    const highestRailBottom = inputs.height - 2 * BOARD_THICKNESS;
+  if (normalizedInputs.furnitureType === "shelving") {
+    const highestRailBottom = normalizedInputs.height - 2 * BOARD_THICKNESS;
 
-    if (inputs.bottomRailClearance > highestRailBottom) {
+    if (normalizedInputs.bottomRailClearance > highestRailBottom) {
       issues.push(
         `Bottom rail clearance is too large for the current height. Maximum valid value is ${highestRailBottom}".`,
       );
-    } else if (inputs.shelfLevelCount > 1) {
+    } else if (normalizedInputs.shelfLevelCount > 1) {
       const railBottomStep =
-        (highestRailBottom - inputs.bottomRailClearance) / (inputs.shelfLevelCount - 1);
+        (highestRailBottom - normalizedInputs.bottomRailClearance) / (normalizedInputs.shelfLevelCount - 1);
 
       if (railBottomStep < 2 * BOARD_THICKNESS) {
         issues.push(
@@ -187,16 +289,25 @@ export function deriveDesign(inputs: AppInputs): DerivedDesign {
         );
       }
     }
+  } else {
+    const upperRailBottom = normalizedInputs.height - 2 * BOARD_THICKNESS;
+    const lowerRailTop = normalizedInputs.bottomRailClearance + BOARD_THICKNESS;
+
+    if (lowerRailTop > upperRailBottom) {
+      issues.push(
+        `Bench rails overlap vertically. Reduce bottom rail clearance or increase height.`,
+      );
+    }
   }
 
   const parts: Part[] =
-    inputs.furnitureType === "top-surface"
+    normalizedInputs.furnitureType === "top-surface"
       ? [
           {
             key: "top-board",
             label: "Top Boards",
             purpose: "Top surface boards",
-            length: inputs.length,
+            length: normalizedInputs.length,
             quantity: boardCountPerLevel,
             color: "#d97706",
           },
@@ -222,7 +333,7 @@ export function deriveDesign(inputs: AppInputs): DerivedDesign {
             key: "shelf-board",
             label: "Shelf Boards",
             purpose: "Continuous shelf boards across full length",
-            length: inputs.length,
+            length: normalizedInputs.length,
             quantity: boardCountPerLevel * shelfLevelCount,
             color: "#d97706",
           },
@@ -244,6 +355,14 @@ export function deriveDesign(inputs: AppInputs): DerivedDesign {
           },
         ];
 
+  const oversizedParts = parts.filter((part) => part.length > STOCK_LENGTH);
+
+  if (oversizedParts.length > 0) {
+    issues.push(
+      `Some cut lengths exceed the 96" stock board length and cannot be produced as single-piece cuts.`,
+    );
+  }
+
   const stockPlan = optimizeStock(parts);
   const totalWaste = stockPlan.reduce((sum, board) => sum + board.waste, 0);
   const totalUsedLength = stockPlan.reduce((sum, board) => sum + board.usedLength, 0);
@@ -251,6 +370,7 @@ export function deriveDesign(inputs: AppInputs): DerivedDesign {
   const estimatedScrewCount = (sideRailPart?.quantity ?? 0) * 4;
 
   return {
+    normalizedInputs,
     frameCount,
     extraSupportHFrameCount,
     framePositions,

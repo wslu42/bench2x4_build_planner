@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import {
   BOARD_THICKNESS,
   BOARD_WIDTH,
@@ -100,19 +100,26 @@ function App() {
   ]);
 
   const design = useMemo(() => deriveDesign(inputs), [inputs]);
-  const isTopSurface = furnitureType === "top-surface";
+  const effectiveInputs = design.normalizedInputs;
+  const isTopSurface = effectiveInputs.furnitureType === "top-surface";
   const boardUnitPrice = DEFAULT_BOARD_UNIT_PRICE;
   const screwUnitPrice = DEFAULT_SCREW_UNIT_PRICE;
   const boardLineTotal = design.stockPlan.length * boardUnitPrice;
   const screwsLineTotal = design.estimatedScrewCount * screwUnitPrice;
   const shoppingGrandTotal = boardLineTotal + screwsLineTotal;
+  const stockSegmentStyles: Record<string, { fill: string; stroke: string }> = {
+    "top-board": { fill: "#FF7B00", stroke: "#BF5C00" },
+    "shelf-board": { fill: "#FF7B00", stroke: "#BF5C00" },
+    "vertical-leg": { fill: "#B68A2E", stroke: "#8A6822" },
+    "side-rail": { fill: "#3A86FF", stroke: "#2B63BF" },
+  };
 
   const ruleBadges = [
     `2x4 actual size: ${BOARD_THICKNESS}" x ${BOARD_WIDTH}"`,
     `Stock length: ${STOCK_LENGTH}"`,
     `Saw kerf: ${SAW_KERF}"`,
-    `Max span: ${formatInches(maxSpan)}`,
-    `Bottom rail clearance: ${formatInches(bottomRailClearance)}`,
+    `Max span: ${formatInches(effectiveInputs.maxSpan)}`,
+    `Bottom rail clearance: ${formatInches(effectiveInputs.bottomRailClearance)}`,
     `Floor plane used as vertical datum`,
     `Fill mode: ${fillMode === "solid" ? "solid" : "transparent pattern"}`,
     isTopSurface
@@ -206,7 +213,7 @@ function App() {
               </div>
               <div>
                 <dt>Bottom rail clearance</dt>
-                <dd>{formatInches(bottomRailClearance)}</dd>
+                <dd>{formatInches(effectiveInputs.bottomRailClearance)}</dd>
               </div>
             </dl>
           </section>
@@ -249,7 +256,7 @@ function App() {
           </div>
 
           <PreviewCanvas
-            inputs={inputs}
+            inputs={effectiveInputs}
             viewMode={viewMode}
             fillMode={fillMode}
             colorTheme={colorTheme}
@@ -257,7 +264,6 @@ function App() {
           />
 
           <section className="panel-section">
-            <h3>Rule Notes</h3>
             <ul className="chip-list">
               {ruleBadges.map((badge) => (
                 <li key={badge} className="chip">
@@ -275,33 +281,19 @@ function App() {
           </section>
 
           <section className="panel-section">
-            <h3>Cut List</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Length</th>
-                  <th>Qty</th>
-                </tr>
-              </thead>
-              <tbody>
-                {design.parts.map((part) => (
-                  <tr key={part.key}>
-                    <td>{part.label}</td>
-                    <td>{formatInches(part.length)}</td>
-                    <td>{part.quantity}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-
-          <section className="panel-section">
             <h3>Shopping List</h3>
-            <table>
+            <table className="shopping-table">
+              <colgroup>
+                <col style={{ width: "26%" }} />
+                <col style={{ width: "22%" }} />
+                <col style={{ width: "31%" }} />
+                <col style={{ width: "9%" }} />
+                <col style={{ width: "12%" }} />
+              </colgroup>
               <thead>
                 <tr>
                   <th>Item</th>
+                  <th>Full Length</th>
                   <th>Unit</th>
                   <th>Qty</th>
                   <th>Cost</th>
@@ -310,12 +302,14 @@ function App() {
               <tbody>
                 <tr>
                   <td>2x4 x 8ft</td>
+                  <td>96"</td>
                   <td>${boardUnitPrice.toFixed(2)} / board</td>
                   <td>{design.stockPlan.length}</td>
                   <td>${boardLineTotal.toFixed(2)}</td>
                 </tr>
                 <tr>
                   <td>Screws</td>
+                  <td>2-1/2 in</td>
                   <td>${screwUnitPrice.toFixed(2)} / each</td>
                   <td>{design.estimatedScrewCount}</td>
                   <td>${screwsLineTotal.toFixed(2)}</td>
@@ -323,7 +317,10 @@ function App() {
               </tbody>
             </table>
             <div className="shopping-total-row">
-              <span>Total Estimate</span>
+              <span className="shopping-total-label">Total Estimate</span>
+              <span className="shopping-total-spacer" aria-hidden="true" />
+              <span className="shopping-total-spacer" aria-hidden="true" />
+              <span className="shopping-total-spacer" aria-hidden="true" />
               <strong>${shoppingGrandTotal.toFixed(2)}</strong>
             </div>
             <p className="material-note">
@@ -357,21 +354,126 @@ function App() {
           </section>
 
           <section className="panel-section">
-            <h3>Board Optimization</h3>
+            <h3>Cut List</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Length</th>
+                  <th>Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                {design.parts.map((part) => (
+                  <tr key={part.key}>
+                    <td>
+                      <span className="table-type-item">
+                        <span
+                          className="preview-legend-swatch"
+                          style={
+                            {
+                              "--swatch-color":
+                                part.key === "top-board" || part.key === "shelf-board"
+                                  ? "#FF7B00"
+                                  : part.key === "vertical-leg"
+                                    ? "#B68A2E"
+                                    : "#3A86FF",
+                              backgroundColor:
+                                part.key === "top-board" || part.key === "shelf-board"
+                                  ? "#FF7B00"
+                                  : part.key === "vertical-leg"
+                                    ? "#B68A2E"
+                                    : "#3A86FF",
+                            } as CSSProperties
+                          }
+                        />
+                        {part.label}
+                      </span>
+                    </td>
+                    <td>{formatInches(part.length)}</td>
+                    <td>{part.quantity}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          <section className="panel-section">
+            <div className="panel-section-header panel-section-header-compact">
+              <h3>Board Optimization</h3>
+              <div className="board-optimization-legend" aria-label="Board optimization legend">
+                <span className="board-optimization-legend-item">
+                  <span
+                    className="board-optimization-legend-swatch"
+                    style={{ backgroundColor: stockSegmentStyles[isTopSurface ? "top-board" : "shelf-board"].fill }}
+                  />
+                  {isTopSurface ? "Top Boards" : "Shelf Boards"}
+                </span>
+                <span className="board-optimization-legend-item">
+                  <span
+                    className="board-optimization-legend-swatch"
+                    style={{ backgroundColor: stockSegmentStyles["vertical-leg"].fill }}
+                  />
+                  Vertical Legs
+                </span>
+                <span className="board-optimization-legend-item">
+                  <span
+                    className="board-optimization-legend-swatch"
+                    style={{ backgroundColor: stockSegmentStyles["side-rail"].fill }}
+                  />
+                  Rails
+                </span>
+                <span className="board-optimization-legend-item">
+                  <span className="board-optimization-legend-swatch board-optimization-legend-waste" />
+                  Waste
+                </span>
+              </div>
+            </div>
             <div className="board-stack">
               {design.stockPlan.map((board) => (
                 <article key={board.boardIndex} className="board-card">
                   <header>
-                    <strong>Board {board.boardIndex}</strong>
-                    <span>{formatInches(board.waste)} waste</span>
+                    <div className="board-card-title">
+                      <strong>Board {board.boardIndex}</strong>
+                      <span>96" full board</span>
+                    </div>
                   </header>
-                  <p>
-                    {board.cuts
-                      .map((cut) => `${cut.label} ${formatInches(cut.length)}`)
-                      .join(" | ")}
-                  </p>
+                  <div className="board-visual" aria-label={`Board ${board.boardIndex} cut layout`}>
+                    <div className="board-visual-track">
+                      {board.cuts.map((cut, index) => {
+                        const segmentStyle = stockSegmentStyles[cut.partKey] ?? {
+                          fill: "#d6c4b2",
+                          stroke: "#8b7357",
+                        };
+                        return (
+                          <div
+                            key={`${board.boardIndex}-${cut.partKey}-${index}`}
+                            className="board-visual-segment"
+                            style={{
+                              width: `${(cut.length / STOCK_LENGTH) * 100}%`,
+                              backgroundColor: segmentStyle.fill,
+                              borderColor: segmentStyle.stroke,
+                            }}
+                            title={`${cut.label} ${formatInches(cut.length)}`}
+                          >
+                            <span>{formatInches(cut.length)}</span>
+                          </div>
+                        );
+                      })}
+                      {board.waste > 0 ? (
+                        <div
+                          className="board-visual-segment board-visual-waste"
+                          style={{ width: `${(board.waste / STOCK_LENGTH) * 100}%` }}
+                          title={`Waste ${formatInches(board.waste)}`}
+                        >
+                          <span>{formatInches(board.waste)} waste</span>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
                   <small>
-                    Used {formatInches(board.usedLength)} including {board.kerfCount} kerf cuts
+                    Used {formatInches(board.usedLength)} including {board.kerfCount} kerf cuts ·{" "}
+                    {formatInches(board.waste)} waste
                   </small>
                 </article>
               ))}
@@ -1156,9 +1258,9 @@ function PreviewCanvas({
         {legendItems.map((item) => (
           <div key={item.label} className="preview-legend-item">
             <span
-              className={`preview-legend-swatch ${fillMode === "pattern" ? `swatch-${item.kind ?? "solid"}` : ""}`}
+              className="preview-legend-swatch"
               style={{
-                backgroundColor: fillMode === "solid" || !item.kind ? item.color : "transparent",
+                backgroundColor: item.color,
                 ["--swatch-color" as string]: item.color,
               }}
             />

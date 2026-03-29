@@ -1,28 +1,78 @@
 # JustUse2x4
 
-Parameter-driven preview and cut-planning web app for fixed 2x4 furniture builds.
+A small React app for planning fixed 2x4 furniture builds.
 
-## Documentation
+It is designed around one constrained build system instead of freeform modeling: you enter outer dimensions, and the app derives board counts, frame layout, cut lengths, stock usage, shopping list cost, and orthographic previews.
 
-- [Product Requirements](c:\Users\racco\OneDrive\Documents\Python\Local\justuse2x4\docs\PRD.md)
-- [Information Architecture](c:\Users\racco\OneDrive\Documents\Python\Local\justuse2x4\docs\information-architecture.md)
-- [Wireframes](c:\Users\racco\OneDrive\Documents\Python\Local\justuse2x4\docs\wireframes.md)
-- [Data Model And Formulas](c:\Users\racco\OneDrive\Documents\Python\Local\justuse2x4\docs\data-model-and-formulas.md)
-- [Engineering Notes](c:\Users\racco\OneDrive\Documents\Python\Local\justuse2x4\docs\engineering-notes.md)
-- [Testing Checklist](c:\Users\racco\OneDrive\Documents\Python\Local\justuse2x4\docs\TESTING.md)
+## What It Supports
 
-## Scope
+- `Bench`
+- `Shelving`
 
-Version 1 supports two furniture systems only:
+## What It Does
 
-- Top Surface (`bench` / `table`)
-- Shelving
+- Generates `top / side / front` orthographic previews
+- Calculates a cut list from fixed 2x4 rules
+- Optimizes cuts against `8 ft` stock boards
+- Estimates screws from rail-to-leg joints
+- Produces a shopping list with default cost assumptions
 
-The product is intentionally parameter-based. It does not support drag-and-drop modeling or arbitrary joinery systems.
+## Current Assumptions
 
-## Development
+- Material: actual `2x4 = 1.5" x 3.5"`
+- Stock length: `96"`
+- Saw kerf: `1/8"`
+- Frame spacing is derived from `Max Span`
+- `Max Span` means the unsupported clear span between adjacent frames
+
+## Pricing Defaults
+
+The shopping list currently uses static default pricing:
+
+- `2x4 x 8ft`: `$4.15` each
+- `Screw`: `$0.06` each
+
+Reference pages:
+
+- Home Depot 2x4 stud: https://www.homedepot.com/p/2-in-x-4-in-x-96-in-Premium-Burrill-Fir-Stud-1000020053/206262176
+- Amazon screw listing: https://www.amazon.com/dp/B0C23LJ6LJ?th=1
+
+These are reference defaults only. Retail pricing can vary by store, region, and time.
+
+## Run Locally
 
 ```bash
 npm install
 npm run dev
 ```
+
+Build for production:
+
+```bash
+npm run build
+```
+
+## Project Structure
+
+- [`src/App.tsx`](./src/App.tsx): UI, preview rendering, material tables
+- [`src/domain.ts`](./src/domain.ts): geometry, formulas, stock optimization
+- [`src/styles.css`](./src/styles.css): layout and visual styling
+
+## Docs
+
+- [Product Requirements](./docs/PRD.md)
+- [Information Architecture](./docs/information-architecture.md)
+- [Wireframes](./docs/wireframes.md)
+- [Data Model And Formulas](./docs/data-model-and-formulas.md)
+- [Engineering Notes](./docs/engineering-notes.md)
+- [Testing Checklist](./docs/TESTING.md)
+
+## Notes
+
+This project is intentionally parameter-based. It does not aim to support:
+
+- drag-and-drop modeling
+- arbitrary joinery systems
+- freeform furniture design
+
+The value of the tool is consistency: one repeatable 2x4 system, fast iteration, and predictable material output.
