@@ -303,7 +303,13 @@ select {
 }
 
 .explode-slider input[type="range"] {
-  width: 50%;
+  display: block;
+  width: 84px;
+  min-width: 84px;
+  height: 20px;
+  appearance: auto;
+  -webkit-appearance: auto;
+  background: transparent;
   accent-color: #8c5a2b;
 }
 
@@ -347,7 +353,10 @@ select {
 }
 
 .svg-control-card {
+  display: grid;
+  gap: 4px;
   padding: 2px 0 0;
+  overflow: visible;
 }
 
 .assembly-visibility-controls {

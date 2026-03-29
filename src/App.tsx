@@ -1216,7 +1216,8 @@ function PreviewCanvas({
   const assemblyFrontBottomLeft = assemblyProject(0, 0, inputs.depth);
   const assemblyControlWidth = 184;
   const assemblyControlX = capsuleX + capsuleWidth - assemblySidebarWidth + (assemblySidebarWidth - assemblyControlWidth) / 2;
-  const assemblyControlY = capsuleY + (capsuleHeight - 202) / 2 - 20;
+  const assemblyControlHeight = 252;
+  const assemblyControlY = capsuleY + (capsuleHeight - assemblyControlHeight) / 2 - 18;
 
   const renderPrism = (
     key: string,
@@ -1964,7 +1965,7 @@ function PreviewCanvas({
                 x={assemblyControlX}
                 y={assemblyControlY}
                 width={assemblyControlWidth}
-                height={202}
+                height={assemblyControlHeight}
               >
                 <div className="svg-control-card">
                   <fieldset className="assembly-visibility-controls">
