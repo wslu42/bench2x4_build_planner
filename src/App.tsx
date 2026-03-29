@@ -728,34 +728,6 @@ function App() {
         <aside className="panel panel-controls">
           <section className="panel-section">
             <div className="parameterization-bundles">
-              <div className="parameterization-input-bundle">
-                <div className="parameterization-card parameterization-input-card">
-                <h3>{t.parameterization}</h3>
-                <p className="muted">{t.parameterizationNote}</p>
-                <section className="field-grid">
-                  <NumberField label={t.lengthIn} value={length} min={12} onChange={setLength} />
-                  <NumberField label={t.depthIn} value={depth} min={3.5} onChange={setDepth} />
-                  <NumberField label={t.heightIn} value={height} min={3.5} onChange={setHeight} />
-                  <NumberField label={t.maxSpanIn} value={maxSpan} min={6} step={6} onChange={setMaxSpan} />
-                  <NumberField
-                    label={t.bottomRailClearanceIn}
-                    value={bottomRailClearance}
-                    min={0}
-                    onChange={setBottomRailClearance}
-                  />
-                  {!isTopSurface ? (
-                    <NumberField
-                      label={t.shelfLevels}
-                      value={shelfLevelCount}
-                      min={1}
-                      step={1}
-                      onChange={setShelfLevelCount}
-                    />
-                  ) : null}
-                </section>
-                </div>
-              </div>
-
               <div className="parameterization-mode-bundle">
                 <div className="parameterization-card parameterization-mode-card">
                   <div className="parameterization-mode-stack">
@@ -783,6 +755,34 @@ function App() {
                     </div>
                   ) : null}
                   </div>
+                </div>
+              </div>
+
+              <div className="parameterization-input-bundle">
+                <div className="parameterization-card parameterization-input-card">
+                  <h3>{t.parameterization}</h3>
+                  <p className="muted">{t.parameterizationNote}</p>
+                  <section className="field-grid">
+                    <NumberField label={t.lengthIn} value={length} min={12} onChange={setLength} />
+                    <NumberField label={t.depthIn} value={depth} min={3.5} onChange={setDepth} />
+                    <NumberField label={t.heightIn} value={height} min={3.5} onChange={setHeight} />
+                    <NumberField label={t.maxSpanIn} value={maxSpan} min={6} step={6} onChange={setMaxSpan} />
+                    <NumberField
+                      label={t.bottomRailClearanceIn}
+                      value={bottomRailClearance}
+                      min={0}
+                      onChange={setBottomRailClearance}
+                    />
+                    {!isTopSurface ? (
+                      <NumberField
+                        label={t.shelfLevels}
+                        value={shelfLevelCount}
+                        min={1}
+                        step={1}
+                        onChange={setShelfLevelCount}
+                      />
+                    ) : null}
+                  </section>
                 </div>
               </div>
             </div>
