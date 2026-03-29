@@ -7,24 +7,43 @@ The app should behave like a single-page workbench with persistent calculation f
 Primary regions:
 
 1. Header
-2. Parameter panel
-3. Preview workspace
-4. Results workspace
+2. Gallery workspace
+3. Parameter panel
+4. Preview workspace
+5. Results workspace
 
 ## Header
 
 Purpose:
 
 - Identify project
-- Allow preset switching
-- Support future save/load actions
+- Switch between planner and gallery
+- Keep furniture-type switching close to parameterization
 
 Content:
 
 - Product title
+- Page switcher: `Planner / Gallery`
 - Furniture type switcher
-- Preset selector
-- Future actions placeholder: save preset, export PDF
+
+## Gallery Workspace
+
+Purpose:
+
+- Show finished build examples
+- Help users start from real cases instead of blank parameters
+
+Content:
+
+- Build cards with photos
+- Build title and short description
+- Key dimensions and settings
+- `Load This Build` action that transfers values into the planner
+
+Default behavior:
+
+- The app lands on `Gallery`
+- Loading a gallery card switches back to the planner and opens `Side View`
 
 ## Parameter Panel
 
@@ -40,12 +59,8 @@ Sections:
 - Overall length
 - Overall depth
 - Overall height
-- Extra support H-frame count
-- Units
-
-### Top Surface Inputs
-
-- Preset type: bench or table
+- Max span
+- Bottom rail clearance
 
 ### Shelving Inputs
 
@@ -55,6 +70,7 @@ Behavior:
 
 - Changing any parameter immediately recalculates preview and material outputs
 - Inputs should have guardrails for minimum valid values
+- Guardrails may clamp invalid values to effective values shown back in the inputs
 
 ## Preview Workspace
 
@@ -88,9 +104,10 @@ Purpose:
 
 Sections:
 
-### Part Summary
+### Shopping List
 
-- Aggregated part types and quantities
+- Purchase-ready material list
+- Includes default unit costs and total estimate
 
 ### Cut List
 
@@ -111,24 +128,30 @@ Sections:
 
 ## User Flow
 
-1. Select furniture type
-2. Enter outer dimensions
-3. Enter extra support H-frame count
-4. If shelving, enter shelf level count
-5. Review top, side, and front previews
-6. Review part summary and cut list
-7. Review optimized 8 ft board allocation
+1. Start in Gallery or Planner
+2. If using Gallery, load an example build
+3. Select furniture type
+4. Enter outer dimensions
+5. Enter max span and bottom rail clearance
+6. If shelving, enter shelf level count
+7. Review top, side, and front previews
+8. Review shopping list and cut list
+9. Review optimized 8 ft board allocation
 
 ## Suggested Navigation
 
 Single-screen desktop layout:
 
-- Left column: parameter panel
-- Center column: preview workspace
-- Right column: results workspace
+- Top: header and page switcher
+- `Gallery` mode: build card grid
+- `Planner` mode:
+  - upper: parameter panel
+  - middle: preview workspace
+  - lower: results workspace
 
 Responsive tablet/mobile layout:
 
-- Parameters
+- Header switcher
+- Gallery cards or planner sections
 - Preview tabs
 - Result accordions

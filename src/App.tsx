@@ -121,7 +121,7 @@ const GALLERY_BUILDS: GalleryBuild[] = [
 ];
 
 function App() {
-  const [pageMode, setPageMode] = useState<PageMode>("planner");
+  const [pageMode, setPageMode] = useState<PageMode>("gallery");
   const [furnitureType, setFurnitureType] = useState<FurnitureType>("top-surface");
   const [viewMode, setViewMode] = useState<ViewMode>("side");
   const [length, setLength] = useState(72);

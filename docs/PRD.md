@@ -17,9 +17,7 @@ Create a lightweight self-use website that parameterizes a fixed 2x4 furniture b
 
 ## Supported Furniture Types
 
-### Top Surface
-
-This type covers both bench and table. The structure is identical; only default heights differ.
+### Bench
 
 Structure:
 
@@ -124,16 +122,16 @@ Key interpretation:
 - Shelf board quantity is derived from inner usable depth
 - Every shelf level uses the same board count and full length
 
-## Difference Between Top Surface And Shelving
+## Difference Between Bench And Shelving
 
 For the same outer depth `D`:
 
-- Top Surface board count is based on outer depth
+- Bench board count is based on outer depth
 - Shelving board count is based on inner depth `D - 3`
 
 Example with `D = 14.5`:
 
-- Top Surface board count = `floor(14.5 / 3.5) = 4`
+- Bench board count = `floor(14.5 / 3.5) = 4`
 - Shelving board count = `floor(11.5 / 3.5) = 3`
 
 ## Max Span Driven Support Frames
@@ -169,12 +167,13 @@ Visualization rules:
 - Do not label every board with IDs
 - Do not show gap dimensions
 - Front view should simplify top/shelf boards into a single thickness band
+- Gallery should show real example photos and allow loading a build into the planner
 
 ## Outputs
 
 - Orthographic preview
-- Cut list
 - Shopping list
+- Cut list
 - Estimated screw count
 - Board optimization
 - Waste summary
@@ -198,6 +197,7 @@ Shopping list cost rules:
 - 2x4 quantity must come from the board count produced by Board Optimization
 - Screw quantity must come from the estimated screw count
 - Cost should be based on shopping list items, not on cut-list rows
+- The total estimate should read as a shopping-list summary, not as another material row
 
 Default pricing references:
 
@@ -243,3 +243,9 @@ Suggested v1 algorithm:
 - Arbitrary 3D rotation
 - Joinery selection
 - Material switching
+
+## Current Product Notes
+
+- The app lands on `Gallery` by default
+- The gallery uses real photos stored locally in `src/gallery_asset`
+- Loading a gallery card returns the user to the planner with the matching parameters applied

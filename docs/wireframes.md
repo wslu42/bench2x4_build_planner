@@ -3,31 +3,31 @@
 ## Desktop Workbench
 
 ```text
-+--------------------------------------------------------------------------------------------------+
-| JustUse2x4                                   [Top Surface v] [Bench v] [Save] [Export]          |
-+------------------------------+--------------------------------------+----------------------------+
-| Parameters                   | Preview                              | Material Output            |
-|                              |                                      |                            |
-| Furniture Type               | [ Top View ] [ Side View ] [ Front ] | Part Summary               |
-|  - Top Surface               |                                      | -------------------------  |
-|  - Shelving                  |  +-------------------------------+   | top boards                |
-|                              |  |                               |   | legs                      |
-| Preset                       |  |        active SVG view        |   | rails                     |
-|  - Bench                     |  |                               |   |                            |
-|  - Table                     |  +-------------------------------+   | Cut List                   |
-|                              |                                      | -------------------------  |
-| Length   [ 72   ]            |  Dimension chips / structural notes  | Part | Purpose | Qty ...  |
-| Depth    [ 14.5 ]            |                                      |                            |
-| Height   [ 11   ]            |                                      | Board Optimization         |
-| Extra H  [ 0    ]            |                                      | -------------------------  |
-| Units    [ in   ]            |                                      | Board 1 ...               |
-|                              |                                      | Board 2 ...               |
-| Shelf Lv [ 3    ] only shelf |                                      |                            |
-|                              |                                      | Waste Summary             |
-| Rule Notes                   |                                      | -------------------------  |
-| - outer dims                 |                                      | boards needed             |
-| - kerf 1/8                   |                                      | total waste               |
-+------------------------------+--------------------------------------+----------------------------+
++------------------------------------------------------------------------------------------------------------------+
+| JustUse2x4                                               [Planner] [Gallery]                                     |
++------------------------------------------------------------------------------------------------------------------+
+| Parameterization                                                                                                 |
+| [Furniture Type: Bench / Shelving] [Length] [Depth] [Height] [Max Span] [Bottom Rail Clearance] [Shelf Levels] |
++------------------------------------------------------------------------------------------------------------------+
+| Preview                                                                                                          |
+|                                                                                                                  |
+|                                      [solid / pattern] [top / side / front]                                     |
+|   SIDE VIEW                                                                                         L / D / H    |
+|   +--------------------------------------------------------------------------------------------+                 |
+|   |                                                                                            |                 |
+|   |                                        active SVG view                                     |                 |
+|   |                                                                                            |                 |
+|   +--------------------------------------------------------------------------------------------+                 |
+|   legend                                                                                                           |
+|   structural note chips                                                                                           |
++------------------------------------------------------------------------------------------------------------------+
+| Material Output                                                                                                  |
+|                                                                                                                  |
+| Shopping List                                                                                                    |
+| Cut List                                                                                                         |
+| Board Optimization                                                                                               |
+| Waste Summary                                                                                                    |
++------------------------------------------------------------------------------------------------------------------+
 ```
 
 ## Mobile / Narrow Layout
@@ -35,13 +35,15 @@
 ```text
 +--------------------------------------+
 | JustUse2x4                           |
-| [Type] [Preset]                      |
+| [Planner] [Gallery]                  |
 +--------------------------------------+
-| Parameters                           |
+| Parameterization                     |
+| [Bench / Shelving]                   |
 | Length                               |
 | Depth                                |
 | Height                               |
-| Extra H                              |
+| Max Span                             |
+| Bottom Rail Clearance                |
 | Shelf Levels                         |
 +--------------------------------------+
 | Preview                              |
@@ -69,11 +71,13 @@
 - Shows footprint `L x D`
 - Shows board pattern
 - Shows H-frame positions
+- Bench boards occupy full outer depth
+- Shelving boards occupy only the inner rail span
 
 ### Side View
 
 - Shows height-depth relationship
-- Shows top board above frame for Top Surface
+- Shows top board above frame for Bench
 - Shows top shelf flush with leg tops for Shelving
 
 ### Front View

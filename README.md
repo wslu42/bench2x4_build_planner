@@ -4,6 +4,8 @@ A small React app for planning fixed 2x4 furniture builds.
 
 It is designed around one constrained build system instead of freeform modeling: you enter outer dimensions, and the app derives board counts, frame layout, cut lengths, stock usage, shopping list cost, and orthographic previews.
 
+The current landing view opens on the gallery first, where example builds can be loaded directly into the planner.
+
 ## What It Supports
 
 - `Bench`
@@ -11,6 +13,8 @@ It is designed around one constrained build system instead of freeform modeling:
 
 ## What It Does
 
+- Opens with a gallery of example builds and photos
+- Loads gallery presets directly into the planner
 - Generates `top / side / front` orthographic previews
 - Calculates a cut list from fixed 2x4 rules
 - Optimizes cuts against `8 ft` stock boards
@@ -57,6 +61,7 @@ npm run build
 - [`src/App.tsx`](./src/App.tsx): UI, preview rendering, material tables
 - [`src/domain.ts`](./src/domain.ts): geometry, formulas, stock optimization
 - [`src/styles.css`](./src/styles.css): layout and visual styling
+- [`src/gallery_asset`](./src/gallery_asset): gallery photos used by the example build page
 
 ## Docs
 
