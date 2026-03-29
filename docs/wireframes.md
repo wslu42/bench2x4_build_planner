@@ -4,7 +4,12 @@
 
 ```text
 +------------------------------------------------------------------------------------------------------------------+
-| JustUse2x4                                               [Planner] [Gallery]                                     |
+| Bench2x4                                                 [Planner] [Gallery]                                     |
++------------------------------------------------------------------------------------------------------------------+
+| Gallery                                                                                                          |
+|                                                                                                                  |
+| [ build photo card ] [ build photo card ] [ build photo card ]                                                  |
+| click photo -> preview overlay with larger image and Load This Build                                             |
 +------------------------------------------------------------------------------------------------------------------+
 | Parameterization                                                                                                 |
 | [Furniture Type: Bench / Shelving] [Length] [Depth] [Height] [Max Span] [Bottom Rail Clearance] [Shelf Levels] |
@@ -34,8 +39,12 @@
 
 ```text
 +--------------------------------------+
-| JustUse2x4                           |
+| Bench2x4                             |
 | [Planner] [Gallery]                  |
++--------------------------------------+
+| Gallery                              |
+| [photo card]                         |
+| tap photo -> preview overlay         |
 +--------------------------------------+
 | Parameterization                     |
 | [Bench / Shelving]                   |
@@ -54,7 +63,7 @@
 | |                                  | |
 | +----------------------------------+ |
 +--------------------------------------+
-| Part Summary                         |
+| Shopping List                        |
 +--------------------------------------+
 | Cut List                             |
 +--------------------------------------+

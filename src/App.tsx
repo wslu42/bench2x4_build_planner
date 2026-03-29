@@ -281,8 +281,8 @@ function App() {
     <div className="app-shell">
       <header className="app-header">
         <div>
-          <p className="eyebrow">JustUse2x4</p>
-          <h1>Fixed 2x4 furniture preview and cut planner</h1>
+          <p className="eyebrow">Bench2x4</p>
+          <h1>2x4 Build Planner</h1>
         </div>
         <div className="segmented app-mode-toggle" aria-label="Page">
           {([
@@ -706,13 +706,22 @@ function App() {
                           <p className="gallery-card-eyebrow">{build.category}</p>
                           <h3>{build.title}</h3>
                         </div>
-                        <span
-                          className={`gallery-chip ${
-                            build.category === "Bench" ? "gallery-chip-bench" : "gallery-chip-shelving"
-                          }`}
-                        >
-                          {build.category}
-                        </span>
+                        <div className="gallery-card-actions">
+                          <span
+                            className={`gallery-chip ${
+                              build.category === "Bench" ? "gallery-chip-bench" : "gallery-chip-shelving"
+                            }`}
+                          >
+                            {build.category}
+                          </span>
+                          <button
+                            type="button"
+                            className="gallery-load-pill"
+                            onClick={() => applyBuildPreset(build.inputs)}
+                          >
+                            Load This Build
+                          </button>
+                        </div>
                       </div>
                       <p className="gallery-card-description">{build.description}</p>
                       <ul className="gallery-meta">
@@ -723,13 +732,6 @@ function App() {
                         <li>{`Clearance ${formatInches(buildInputs.bottomRailClearance)}`}</li>
                         {shelfLevelsLabel ? <li>{shelfLevelsLabel}</li> : null}
                       </ul>
-                      <button
-                        type="button"
-                        className="gallery-load-button"
-                        onClick={() => applyBuildPreset(build.inputs)}
-                      >
-                        Load This Build
-                      </button>
                     </div>
                   </article>
                 );
@@ -747,16 +749,33 @@ function App() {
           onClick={() => setGalleryPreview(null)}
         >
           <div className="gallery-lightbox-panel" onClick={(event) => event.stopPropagation()}>
-            <button
-              type="button"
-              className="gallery-lightbox-close"
-              onClick={() => setGalleryPreview(null)}
-              aria-label="Close image preview"
-            >
-              Close
-            </button>
+            <div className="gallery-lightbox-header">
+              <p className="gallery-lightbox-caption">{galleryPreview.title}</p>
+              <button
+                type="button"
+                className="gallery-lightbox-close"
+                onClick={() => setGalleryPreview(null)}
+                aria-label="Close image preview"
+              >
+                Close
+              </button>
+            </div>
             <img src={galleryPreview.src} alt={galleryPreview.title} className="gallery-lightbox-image" />
-            <p className="gallery-lightbox-caption">{galleryPreview.title}</p>
+            <div className="gallery-lightbox-actions">
+              <button
+                type="button"
+                className="gallery-load-button"
+                onClick={() => {
+                  const selectedBuild = GALLERY_BUILDS.find((build) => build.title === galleryPreview.title);
+                  if (selectedBuild) {
+                    applyBuildPreset(selectedBuild.inputs);
+                  }
+                  setGalleryPreview(null);
+                }}
+              >
+                Load This Build
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

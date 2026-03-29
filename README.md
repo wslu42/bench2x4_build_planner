@@ -1,4 +1,4 @@
-# JustUse2x4
+# Bench2x4
 
 A small React app for planning fixed 2x4 furniture builds.
 
@@ -14,6 +14,7 @@ The current landing view opens on the gallery first, where example builds can be
 ## What It Does
 
 - Opens with a gallery of example builds and photos
+- Lets gallery photos open in a larger preview
 - Loads gallery presets directly into the planner
 - Generates `top / side / front` orthographic previews
 - Calculates a cut list from fixed 2x4 rules

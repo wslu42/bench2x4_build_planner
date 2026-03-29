@@ -36,6 +36,7 @@ Purpose:
 Content:
 
 - Build cards with photos
+- Clickable photos that open a larger preview overlay
 - Build title and short description
 - Key dimensions and settings
 - `Load This Build` action that transfers values into the planner

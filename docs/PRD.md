@@ -2,7 +2,7 @@
 
 ## Product Name
 
-JustUse2x4
+Bench2x4
 
 ## Objective
 
@@ -168,6 +168,8 @@ Visualization rules:
 - Do not show gap dimensions
 - Front view should simplify top/shelf boards into a single thickness band
 - Gallery should show real example photos and allow loading a build into the planner
+- Gallery photos should open a larger preview overlay
+- The preview overlay should include a clear `Load This Build` action
 
 ## Outputs
 

@@ -625,6 +625,14 @@ th {
   gap: 12px;
 }
 
+.gallery-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: end;
+}
+
 .gallery-card-eyebrow {
   margin: 0 0 4px;
   color: #8c5a2b;
@@ -679,18 +687,37 @@ th {
   font-weight: 600;
 }
 
+.gallery-load-pill {
+  border: 1px solid rgba(154, 120, 87, 0.18);
+  background: #ead8c4;
+  color: #5d4023;
+  border-radius: 999px;
+  padding: 7px 11px;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.gallery-load-pill:hover {
+  background: #dfc7ae;
+}
+
 .gallery-load-button {
-  border: 0;
-  background: #2f241c;
-  color: #fffaf1;
-  border-radius: 14px;
-  padding: 12px 14px;
+  border: 1px solid rgba(154, 120, 87, 0.18);
+  background: #ead8c4;
+  color: #5d4023;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font: inherit;
+  font-size: 0.92rem;
   font-weight: 700;
   cursor: pointer;
 }
 
 .gallery-load-button:hover {
-  background: #4a3628;
+  background: #dfc7ae;
 }
 
 .gallery-lightbox {
@@ -713,6 +740,13 @@ th {
   border-radius: 28px;
   background: #fffaf3;
   box-shadow: 0 24px 60px rgba(44, 29, 20, 0.28);
+}
+
+.gallery-lightbox-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .gallery-lightbox-close {
@@ -738,8 +772,14 @@ th {
 .gallery-lightbox-caption {
   margin: 0;
   color: #6f5640;
+  font-size: 1.2rem;
   font-weight: 700;
-  text-align: center;
+  line-height: 1.2;
+}
+
+.gallery-lightbox-actions {
+  display: grid;
+  place-items: center;
 }
 
 @media (max-width: 1180px) {
