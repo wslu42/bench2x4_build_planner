@@ -29,6 +29,11 @@ type GalleryBuild = {
   inputs: AppInputs;
 };
 
+type GalleryPreview = {
+  src: string;
+  title: string;
+};
+
 type FieldProps = {
   label: string;
   value: number;
@@ -131,7 +136,23 @@ function App() {
   const [bottomRailClearance, setBottomRailClearance] = useState(6);
   const [shelfLevelCount, setShelfLevelCount] = useState(3);
   const [fillMode, setFillMode] = useState<FillMode>("solid");
+  const [galleryPreview, setGalleryPreview] = useState<GalleryPreview | null>(null);
   const colorTheme: ColorTheme = "sunset";
+
+  useEffect(() => {
+    if (!galleryPreview) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setGalleryPreview(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [galleryPreview]);
 
   const handleFurnitureTypeChange = (nextType: FurnitureType) => {
     setFurnitureType(nextType);
@@ -667,18 +688,31 @@ function App() {
 
                 return (
                   <article key={build.id} className="gallery-card">
-                    <div
-                      className="gallery-image"
-                      aria-hidden="true"
-                      style={{ backgroundImage: `url(${build.imageSrc})` }}
-                    />
+                    <button
+                      type="button"
+                      className="gallery-image-button"
+                      onClick={() => setGalleryPreview({ src: build.imageSrc, title: build.title })}
+                      aria-label={`Preview ${build.title} photo`}
+                    >
+                      <div
+                        className="gallery-image"
+                        aria-hidden="true"
+                        style={{ backgroundImage: `url(${build.imageSrc})` }}
+                      />
+                    </button>
                     <div className="gallery-card-body">
                       <div className="gallery-card-header">
                         <div>
                           <p className="gallery-card-eyebrow">{build.category}</p>
                           <h3>{build.title}</h3>
                         </div>
-                        <span className="gallery-chip">{build.category}</span>
+                        <span
+                          className={`gallery-chip ${
+                            build.category === "Bench" ? "gallery-chip-bench" : "gallery-chip-shelving"
+                          }`}
+                        >
+                          {build.category}
+                        </span>
                       </div>
                       <p className="gallery-card-description">{build.description}</p>
                       <ul className="gallery-meta">
@@ -704,6 +738,28 @@ function App() {
           </section>
         </main>
       )}
+      {galleryPreview ? (
+        <div
+          className="gallery-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${galleryPreview.title} preview`}
+          onClick={() => setGalleryPreview(null)}
+        >
+          <div className="gallery-lightbox-panel" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="gallery-lightbox-close"
+              onClick={() => setGalleryPreview(null)}
+              aria-label="Close image preview"
+            >
+              Close
+            </button>
+            <img src={galleryPreview.src} alt={galleryPreview.title} className="gallery-lightbox-image" />
+            <p className="gallery-lightbox-caption">{galleryPreview.title}</p>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

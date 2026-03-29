@@ -597,6 +597,15 @@ th {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
+.gallery-image-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
 .gallery-image {
   height: 210px;
   border-bottom: 1px solid rgba(154, 120, 87, 0.12);
@@ -632,11 +641,19 @@ th {
 .gallery-chip {
   padding: 7px 10px;
   border-radius: 999px;
-  background: #f3e2ce;
-  color: #6f4a29;
   font-size: 0.78rem;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.gallery-chip-bench {
+  background: #ff7b00;
+  color: #fff7ed;
+}
+
+.gallery-chip-shelving {
+  background: #3a86ff;
+  color: #eff6ff;
 }
 
 .gallery-card-description {
@@ -674,6 +691,55 @@ th {
 
 .gallery-load-button:hover {
   background: #4a3628;
+}
+
+.gallery-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: rgba(44, 29, 20, 0.72);
+}
+
+.gallery-lightbox-panel {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  max-width: min(92vw, 1120px);
+  max-height: 90vh;
+  padding: 20px;
+  border-radius: 28px;
+  background: #fffaf3;
+  box-shadow: 0 24px 60px rgba(44, 29, 20, 0.28);
+}
+
+.gallery-lightbox-close {
+  justify-self: end;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(154, 120, 87, 0.18);
+  background: #f7ead8;
+  color: #6f4a29;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gallery-lightbox-image {
+  display: block;
+  max-width: 100%;
+  max-height: min(72vh, 900px);
+  border-radius: 20px;
+  object-fit: contain;
+}
+
+.gallery-lightbox-caption {
+  margin: 0;
+  color: #6f5640;
+  font-weight: 700;
+  text-align: center;
 }
 
 @media (max-width: 1180px) {
