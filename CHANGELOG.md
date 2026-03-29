@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Gallery page with example build cards and real photos from `src/gallery_asset`
+- Bilingual gallery promo card above the example builds
 - Click-to-preview gallery lightbox with `Load This Build`
 - Shopping List with default pricing and total estimate
 - Board Optimization proportional bars and waste summary

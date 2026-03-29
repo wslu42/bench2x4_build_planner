@@ -22,18 +22,21 @@ import twoTierShelfImage from "./gallery_asset/two_tier_shelf_L51_D17p5_H92.jpg"
 type FillMode = "solid" | "pattern";
 type ColorTheme = "rainbow" | "pinkblue" | "neon" | "sunset" | "violet";
 type PageMode = "planner" | "gallery";
+type Locale = "en" | "zh-TW";
 type GalleryBuildInputs = Omit<TopSurfaceInputs, "maxSpan"> | Omit<ShelvingInputs, "maxSpan">;
+type LocalizedText = Record<Locale, string>;
 
 type GalleryBuild = {
   id: string;
-  title: string;
-  category: "Bench" | "Shelving";
-  description: string;
+  title: LocalizedText;
+  category: FurnitureType;
+  description: LocalizedText;
   imageSrc: string;
   inputs: GalleryBuildInputs;
 };
 
 type GalleryPreview = {
+  id: string;
   src: string;
   title: string;
 };
@@ -52,6 +55,14 @@ type FieldProps = {
   onChange: (nextValue: number) => void;
 };
 
+type IconToggleProps<T extends string> = {
+  ariaLabel: string;
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+  caption?: string;
+};
+
 function NumberField({ label, value, min, step = 0.5, onChange }: FieldProps) {
   return (
     <label className="field">
@@ -67,8 +78,268 @@ function NumberField({ label, value, min, step = 0.5, onChange }: FieldProps) {
   );
 }
 
+function IconToggle<T extends string>({
+  ariaLabel,
+  options,
+  value,
+  onChange,
+  caption,
+}: IconToggleProps<T>) {
+  return (
+    <div className="icon-toggle">
+      {caption ? <span className="icon-toggle-caption">{caption}</span> : null}
+      <div className="icon-toggle-track" role="group" aria-label={ariaLabel}>
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={`icon-toggle-button ${value === option.value ? "active" : ""}`}
+            onClick={() => onChange(option.value)}
+            aria-pressed={value === option.value}
+            aria-label={option.label}
+            title={option.label}
+          >
+            <span className="icon-toggle-glyph" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="icon-toggle-labels" aria-hidden="true">
+        {options.map((option) => (
+          <span key={option.value} className={value === option.value ? "active" : ""}>
+            {option.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const DEFAULT_BOARD_UNIT_PRICE = 4.15;
 const DEFAULT_SCREW_UNIT_PRICE = 0.06;
+const LOCALE_STORAGE_KEY = "bench2x4-locale";
+
+const UI_STRINGS = {
+  en: {
+    appTitle: "2x4 Build Planner",
+    pagePlanner: "Planner",
+    pageGallery: "Gallery",
+    languageEnglish: "EN",
+    languageTraditionalChinese: "繁中",
+    parameterization: "Build Size",
+    parameterizationNote: "Enter the outside size. Board counts update automatically.",
+    lengthIn: "Length (in)",
+    depthIn: "Depth (in)",
+    heightIn: "Height (in)",
+    maxSpanIn: "Max Open Span (in)",
+    bottomRailClearanceIn: "Bottom Rail Height (in)",
+    shelfLevels: "Shelf Levels",
+    bench: "Bench",
+    shelving: "Shelf",
+    frameMode: "Frame Style",
+    hFrame: "H-frame",
+    pFrame: "P-frame",
+    derivedSummary: "Build Summary",
+    frameCount: "Total frames",
+    extraHFrames: "Middle frames",
+    boardsPerLevel: "Boards per row",
+    legLength: "Leg cut length",
+    railLength: "Rail cut length",
+    actualClearSpan: "Actual open span",
+    bottomRailClearance: "Bottom rail height",
+    preview: "Preview",
+    previewNote: "Simple SVG views to check the structure.",
+    solid: "solid",
+    seeThru: "see-through",
+    top: "top",
+    side: "side",
+    front: "front",
+    assembly: "3D",
+    materialOutput: "Materials",
+    shoppingList: "Shopping List",
+    item: "Item",
+    fullLength: "Stock Length",
+    unit: "Price",
+    qty: "Qty",
+    screws: "Screws",
+    perBoard: "/ board",
+    perEach: "/ each",
+    totalEstimate: "Estimated Total",
+    boardsCostBreakdown: "Boards",
+    screwsCostBreakdown: "Screws",
+    shoppingNote: "Cost is based on the board count from Board Layout plus the screw estimate.",
+    pricingReferencePrefix: "Price reference: Home Depot 8 ft 2x4 at",
+    pricingReferenceMiddle: "per board, and Amazon screws at",
+    pricingReferenceSuffix: "per screw. Prices may change by store and over time.",
+    sources: "Sources:",
+    cutList: "Cut List",
+    type: "Part",
+    lengthColumn: "Length",
+    boardOptimization: "Board Layout",
+    boardOptimizationLegend: "Board layout legend",
+    verticalLegs: "Legs",
+    rails: "Rails",
+    waste: "Scrap",
+    boardN: "Board",
+    fullBoard: 'stock board',
+    cutLayout: "cut layout",
+    usedIncludingKerfWaste: "Used {used} including {kerfCount} kerf cuts · {waste} waste",
+    wasteSummary: "Scrap Summary",
+    boardsNeeded: "Stock boards needed",
+    totalUsed: "Total Used",
+    totalWaste: "Total Scrap",
+    buildGallery: "Example Builds",
+    buildGalleryNote: "Ready-made builds that use the same 2x4 system. Load one into the planner.",
+    levels: "Levels",
+    frame: "Frame",
+    clearance: "Bottom rail",
+    loadThisBuild: "Load Build",
+    close: "Close",
+    closeImagePreview: "Close image preview",
+    previewPhoto: "Preview {title} photo",
+    imagePreview: "{title} preview",
+    actual2x4: 'Actual board size: {thickness}" x {width}"',
+    stockBoardLength: 'Stock board length: {length}"',
+    sawKerf: 'Saw cut width: {kerf}"',
+    maxSpanBadge: "Max open span: {value}",
+    bottomRailClearanceBadge: "Bottom rail height: {value}",
+    topBoardCount: "Top boards: {count}",
+    shelfBoardCountPerLevel: "Shelf board count per level: {count}",
+    frameModeBadge: "Frame style: {mode}",
+    topBoards: "Top Boards",
+    shelfBoards: "Shelf Boards",
+    extraSupportFrames: "Middle Frames",
+    frontLegs: "Front Legs",
+    rearLegs: "Rear Legs",
+    sideRails: "Side Rails",
+    dimensions: "Size",
+    showHide: "Show",
+    boards: "Boards",
+    legs: "Legs",
+    explodeAmount: "Pull Apart",
+    buildConstraintWarning: "Build Limit Warning",
+    depthLabel: "Depth {value}",
+    heightLabel: "Height {value}",
+    lengthLabel: "Length {value}",
+    clearSpanLabel: "Open Span {value}",
+    boardGapLabel: "Board Gap {value}",
+    railLabel: "Rail {value}",
+    clearanceLabel: "Clearance {value}",
+    levelGapLabel: "Level Gap {value}",
+    floorZero: 'FLOOR 0"',
+  },
+  "zh-TW": {
+    appTitle: "2x4 組裝規劃工具",
+    pagePlanner: "規劃器",
+    pageGallery: "案例集",
+    languageEnglish: "EN",
+    languageTraditionalChinese: "繁中",
+    parameterization: "參數設定",
+    parameterizationNote: "所有輸入皆為外部尺寸，板材數量會自動推導。",
+    lengthIn: "長度（英吋）",
+    depthIn: "深度（英吋）",
+    heightIn: "高度（英吋）",
+    maxSpanIn: "最大跨距（英吋）",
+    bottomRailClearanceIn: "底部橫檔離地（英吋）",
+    shelfLevels: "層數",
+    bench: "長凳",
+    shelving: "層架",
+    frameMode: "框架模式",
+    hFrame: "H 型框",
+    pFrame: "P 型框",
+    derivedSummary: "推導摘要",
+    frameCount: "框架數量",
+    extraHFrames: "額外 H 型支撐",
+    boardsPerLevel: "每層板數",
+    legLength: "立柱長度",
+    railLength: "橫檔長度",
+    actualClearSpan: "實際淨跨距",
+    bottomRailClearance: "底部橫檔離地",
+    preview: "預覽",
+    previewNote: "以正投影 SVG 檢查結構配置。",
+    solid: "實心",
+    seeThru: "透視",
+    top: "上視",
+    side: "側視",
+    front: "正視",
+    assembly: "組裝",
+    materialOutput: "材料輸出",
+    shoppingList: "採購清單",
+    item: "項目",
+    fullLength: "原材長度",
+    unit: "單價",
+    qty: "數量",
+    screws: "螺絲",
+    perBoard: "/ 根",
+    perEach: "/ 支",
+    totalEstimate: "總成本估算",
+    boardsCostBreakdown: "木料",
+    screwsCostBreakdown: "螺絲",
+    shoppingNote: "採購成本依 Board Optimization 的最佳板材數量，再加上估算螺絲數量計算。",
+    pricingReferencePrefix: "預設價格參考：Home Depot 的 8 呎 2x4 每根",
+    pricingReferenceMiddle: "，Amazon 螺絲每支",
+    pricingReferenceSuffix: "。Home Depot 價格會因門市不同而變動，Amazon 價格也可能隨時間調整。",
+    sources: "資料來源：",
+    cutList: "裁切清單",
+    type: "類型",
+    lengthColumn: "長度",
+    boardOptimization: "板材配置",
+    boardOptimizationLegend: "板材配置圖例",
+    verticalLegs: "立柱",
+    rails: "橫檔",
+    waste: "餘料",
+    boardN: "板材",
+    fullBoard: "完整板",
+    cutLayout: "裁切配置",
+    usedIncludingKerfWaste: "已用 {used}，包含 {kerfCount} 道鋸縫；餘料 {waste}",
+    wasteSummary: "餘料摘要",
+    boardsNeeded: "所需板材",
+    totalUsed: "總使用長度",
+    totalWaste: "總餘料",
+    buildGallery: "案例集",
+    buildGalleryNote: "這些案例都使用相同的固定 2x4 結構系統，可直接載入參數到規劃器。",
+    levels: "層數",
+    frame: "框架",
+    clearance: "離地",
+    loadThisBuild: "載入這個案例",
+    close: "關閉",
+    closeImagePreview: "關閉圖片預覽",
+    previewPhoto: "預覽 {title} 圖片",
+    imagePreview: "{title} 預覽",
+    actual2x4: '實際 2x4 尺寸：{thickness}" x {width}"',
+    stockBoardLength: '原材板長：{length}"',
+    sawKerf: '鋸縫：{kerf}"',
+    maxSpanBadge: "最大跨距：{value}",
+    bottomRailClearanceBadge: "底部橫檔離地：{value}",
+    topBoardCount: "頂板數量：{count}",
+    shelfBoardCountPerLevel: "每層層板數量：{count}",
+    frameModeBadge: "框架模式：{mode}",
+    topBoards: "頂板",
+    shelfBoards: "層板",
+    extraSupportFrames: "額外支撐框",
+    frontLegs: "前側立柱",
+    rearLegs: "後側立柱",
+    sideRails: "側邊橫檔",
+    dimensions: "尺寸",
+    showHide: "顯示 / 隱藏",
+    boards: "板材",
+    legs: "立柱",
+    explodeAmount: "分解程度",
+    buildConstraintWarning: "結構限制警示",
+    depthLabel: "深度 {value}",
+    heightLabel: "高度 {value}",
+    lengthLabel: "長度 {value}",
+    clearSpanLabel: "淨跨距 {value}",
+    boardGapLabel: "板縫 {value}",
+    railLabel: "橫檔 {value}",
+    clearanceLabel: "離地 {value}",
+    levelGapLabel: "層間距 {value}",
+    floorZero: '地板 0"',
+  },
+} as const;
 
 function formatAssemblyDimension(value: number): string {
   if (value <= 24) {
@@ -86,12 +357,45 @@ function formatAssemblyDimension(value: number): string {
   return `${feet}' ${formatInches(roundedInches)}`;
 }
 
+function fillTemplate(template: string, values: Record<string, string | number>) {
+  return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? ""));
+}
+
+function getLocalizedPartLabel(
+  locale: Locale,
+  partKey: string,
+  frameMode?: FrameMode,
+  isTopSurface?: boolean,
+) {
+  const t = UI_STRINGS[locale];
+  switch (partKey) {
+    case "top-board":
+      return t.topBoards;
+    case "shelf-board":
+      return t.shelfBoards;
+    case "vertical-leg":
+      return !isTopSurface && frameMode === "p-frame" ? t.frontLegs : t.verticalLegs;
+    case "rear-leg":
+      return t.rearLegs;
+    case "side-rail":
+      return t.sideRails;
+    default:
+      return partKey;
+  }
+}
+
 const GALLERY_BUILDS: GalleryBuild[] = [
   {
     id: "entry-bench",
-    title: "Entry Bench",
-    category: "Bench",
-    description: "Compact hallway bench with a simple open base and generous clearance.",
+    title: {
+      en: "Entry Bench",
+      "zh-TW": "玄關長凳",
+    },
+    category: "top-surface",
+    description: {
+      en: "Compact hallway bench with a simple open base and generous clearance.",
+      "zh-TW": "適合玄關與走道的緊湊長凳，底部開放、離地空間充足。",
+    },
     imageSrc: entryBenchImage,
     inputs: {
       furnitureType: "top-surface",
@@ -103,9 +407,15 @@ const GALLERY_BUILDS: GalleryBuild[] = [
   },
   {
     id: "long-bench",
-    title: "Long Bench",
-    category: "Bench",
-    description: "Longer seating span with one extra support frame to reduce flex.",
+    title: {
+      en: "Long Bench",
+      "zh-TW": "長版長凳",
+    },
+    category: "top-surface",
+    description: {
+      en: "Longer seating span with one extra support frame to reduce flex.",
+      "zh-TW": "較長的坐面配置，加入一組額外支撐框以降低撓曲。",
+    },
     imageSrc: longBenchImage,
     inputs: {
       furnitureType: "top-surface",
@@ -117,9 +427,15 @@ const GALLERY_BUILDS: GalleryBuild[] = [
   },
   {
     id: "two-tier-shelf",
-    title: "Two-Tier Shelf",
-    category: "Shelving",
-    description: "Open shelving preset for entry or workshop storage with comfortable lower clearance.",
+    title: {
+      en: "Two-Tier Shelf",
+      "zh-TW": "雙層層架",
+    },
+    category: "shelving",
+    description: {
+      en: "Open shelving preset for entry or workshop storage with comfortable lower clearance.",
+      "zh-TW": "適合玄關或工作間的開放式層架，底部保留較大的使用淨空。",
+    },
     imageSrc: twoTierShelfImage,
     inputs: {
       furnitureType: "shelving",
@@ -133,9 +449,15 @@ const GALLERY_BUILDS: GalleryBuild[] = [
   },
   {
     id: "three-tier-shelf",
-    title: "Three-Tier Shelf",
-    category: "Shelving",
-    description: "Denser storage layout that still respects the fixed 2x4 frame system.",
+    title: {
+      en: "Three-Tier Shelf",
+      "zh-TW": "三層層架",
+    },
+    category: "shelving",
+    description: {
+      en: "Denser storage layout that still respects the fixed 2x4 frame system.",
+      "zh-TW": "更高密度的收納配置，同時維持固定 2x4 結構系統。",
+    },
     imageSrc: threeTierShelfImage,
     inputs: {
       furnitureType: "shelving",
@@ -149,7 +471,33 @@ const GALLERY_BUILDS: GalleryBuild[] = [
   },
 ];
 
+const GALLERY_PROMO = {
+  en: {
+    eyebrow: "WHY 2x4",
+    title: "Overbuilt, repairable, and weirdly fun to plan with.",
+    body:
+      "This tool is for people who look at a humble 2x4 and see a dependable building block, not just framing lumber. Houses trust it to hold up roofs. We can trust it to hold up benches, shelves, and all the everyday stuff that usually ends up on wobbly furniture.",
+    body2:
+      "I wanted a planner that thinks the way 2x4 projects actually work: outside dimensions first, repeated frames, simple cuts, predictable spans, clear stock usage, and a shopping list you can believe before you leave for the hardware store.",
+  },
+  "zh-TW": {
+    eyebrow: "為什麼是 2x4",
+    title: "夠耐用、能維修，而且規劃起來意外地有趣。",
+    body:
+      "這個工具是做給這樣的人：看到一根普通 2x4，不會只想到建材，而是想到一個可靠、直接、耐操的家具模組。房子都靠它撐屋頂了，拿來做長椅、層架，還有那些每天都要承重的東西，其實非常合理。",
+    body2:
+      "我想做的是一個真的用 2x4 邏輯在思考的規劃器：先看外部尺寸，再推導重複框架、簡單切法、可預期的跨度、原材使用量，還有一份出門去五金行前就能先相信的採買清單。",
+  },
+} as const;
+
 function App() {
+  const [locale, setLocale] = useState<Locale>(() => {
+    if (typeof window === "undefined") {
+      return "zh-TW";
+    }
+    const saved = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+    return saved === "en" || saved === "zh-TW" ? saved : "zh-TW";
+  });
   const [pageMode, setPageMode] = useState<PageMode>("gallery");
   const [furnitureType, setFurnitureType] = useState<FurnitureType>("top-surface");
   const [viewMode, setViewMode] = useState<ViewMode>("assembly");
@@ -169,6 +517,16 @@ function App() {
   const [fillMode, setFillMode] = useState<FillMode>("solid");
   const [galleryPreview, setGalleryPreview] = useState<GalleryPreview | null>(null);
   const colorTheme: ColorTheme = "sunset";
+  const t = UI_STRINGS[locale];
+  const galleryPromo = GALLERY_PROMO[locale];
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   useEffect(() => {
     if (!galleryPreview) {
@@ -268,15 +626,21 @@ function App() {
   };
 
   const ruleBadges = [
-    `Actual 2x4: ${BOARD_THICKNESS}" × ${BOARD_WIDTH}"`,
-    `Stock board length: ${STOCK_LENGTH}"`,
-    `Saw kerf: ${SAW_KERF}"`,
-    `Max span: ${formatInches(effectiveInputs.maxSpan)}`,
-    `Bottom rail clearance: ${formatInches(effectiveInputs.bottomRailClearance)}`,
+    fillTemplate(t.actual2x4, { thickness: BOARD_THICKNESS, width: BOARD_WIDTH }),
+    fillTemplate(t.stockBoardLength, { length: STOCK_LENGTH }),
+    fillTemplate(t.sawKerf, { kerf: SAW_KERF }),
+    fillTemplate(t.maxSpanBadge, { value: formatInches(effectiveInputs.maxSpan) }),
+    fillTemplate(t.bottomRailClearanceBadge, {
+      value: formatInches(effectiveInputs.bottomRailClearance),
+    }),
     isTopSurface
-      ? `Top board count: ${design.boardCountPerLevel}`
-      : `Shelf board count per level: ${design.boardCountPerLevel}`,
-    !isTopSurface ? `Frame mode: ${frameMode === "h-frame" ? "H-frame" : "P-frame"}` : null,
+      ? fillTemplate(t.topBoardCount, { count: design.boardCountPerLevel })
+      : fillTemplate(t.shelfBoardCountPerLevel, { count: design.boardCountPerLevel }),
+    !isTopSurface
+      ? fillTemplate(t.frameModeBadge, {
+          mode: frameMode === "h-frame" ? t.hFrame : t.pFrame,
+        })
+      : null,
   ].filter((badge): badge is string => Boolean(badge));
 
   useEffect(() => {
@@ -323,22 +687,39 @@ function App() {
       <header className="app-header">
         <div>
           <p className="eyebrow">Bench2x4</p>
-          <h1>2x4 Build Planner</h1>
+          <h1>{t.appTitle}</h1>
         </div>
-        <div className="segmented app-mode-toggle" aria-label="Page">
-          {([
-            { value: "planner", label: "Planner" },
-            { value: "gallery", label: "Gallery" },
-          ] as const).map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={pageMode === option.value ? "active" : ""}
-              onClick={() => setPageMode(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
+        <div className="app-header-actions">
+          <div className="segmented app-language-toggle" aria-label={locale === "en" ? "Language" : "語言"}>
+            {([
+              { value: "en", label: UI_STRINGS.en.languageEnglish },
+              { value: "zh-TW", label: UI_STRINGS["zh-TW"].languageTraditionalChinese },
+            ] as const).map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={locale === option.value ? "active" : ""}
+                onClick={() => setLocale(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <div className="segmented app-mode-toggle" aria-label={locale === "en" ? "Page" : "頁面"}>
+            {([
+              { value: "planner", label: t.pagePlanner },
+              { value: "gallery", label: t.pageGallery },
+            ] as const).map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={pageMode === option.value ? "active" : ""}
+                onClick={() => setPageMode(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
@@ -348,24 +729,23 @@ function App() {
           <section className="panel-section">
             <div className="parameterization-bundles">
               <div className="parameterization-input-bundle">
-                <h3>Parameterization</h3>
-                <p className="muted">
-                  All inputs are outer dimensions. Board counts are derived automatically.
-                </p>
+                <div className="parameterization-card parameterization-input-card">
+                <h3>{t.parameterization}</h3>
+                <p className="muted">{t.parameterizationNote}</p>
                 <section className="field-grid">
-                  <NumberField label="Length (in)" value={length} min={12} onChange={setLength} />
-                  <NumberField label="Depth (in)" value={depth} min={3.5} onChange={setDepth} />
-                  <NumberField label="Height (in)" value={height} min={3.5} onChange={setHeight} />
-                  <NumberField label="Max Span (in)" value={maxSpan} min={6} step={6} onChange={setMaxSpan} />
+                  <NumberField label={t.lengthIn} value={length} min={12} onChange={setLength} />
+                  <NumberField label={t.depthIn} value={depth} min={3.5} onChange={setDepth} />
+                  <NumberField label={t.heightIn} value={height} min={3.5} onChange={setHeight} />
+                  <NumberField label={t.maxSpanIn} value={maxSpan} min={6} step={6} onChange={setMaxSpan} />
                   <NumberField
-                    label="Bottom Rail Clearance (in)"
+                    label={t.bottomRailClearanceIn}
                     value={bottomRailClearance}
                     min={0}
                     onChange={setBottomRailClearance}
                   />
                   {!isTopSurface ? (
                     <NumberField
-                      label="Shelf Levels"
+                      label={t.shelfLevels}
                       value={shelfLevelCount}
                       min={1}
                       step={1}
@@ -373,79 +753,62 @@ function App() {
                     />
                   ) : null}
                 </section>
+                </div>
               </div>
 
               <div className="parameterization-mode-bundle">
-                <div className="parameterization-mode-stack">
-                  <div className="segmented segmented-mode" aria-label="Furniture Type">
-                    {([
-                      { value: "top-surface", label: "Bench" },
-                      { value: "shelving", label: "Shelving" },
-                    ] as const).map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={furnitureType === option.value ? "active" : ""}
-                        onClick={() => handleFurnitureTypeChange(option.value)}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
+                <div className="parameterization-card parameterization-mode-card">
+                  <div className="parameterization-mode-stack">
+                  <IconToggle
+                    ariaLabel={locale === "en" ? "Furniture Type" : "家具類型"}
+                    options={[
+                      { value: "top-surface", label: t.bench },
+                      { value: "shelving", label: t.shelving },
+                    ]}
+                    value={furnitureType}
+                    onChange={handleFurnitureTypeChange}
+                  />
                   {!isTopSurface ? (
                     <div className="parameterization-submode">
-                      <span>Frame Mode</span>
-                      <div className="segmented segmented-mode" aria-label="Frame Mode">
-                        {([
-                          { value: "h-frame", label: "H-frame" },
-                          { value: "p-frame", label: "P-frame" },
-                        ] as const).map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            className={frameMode === option.value ? "active" : ""}
-                            onClick={() => setFrameMode(option.value)}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
+                      <IconToggle
+                        ariaLabel={locale === "en" ? "Frame Mode" : "框架模式"}
+                        options={[
+                          { value: "h-frame", label: t.hFrame },
+                          { value: "p-frame", label: t.pFrame },
+                        ]}
+                        value={frameMode}
+                        onChange={setFrameMode}
+                        caption={t.frameMode}
+                      />
                     </div>
                   ) : null}
+                  </div>
                 </div>
               </div>
             </div>
           </section>
 
           <section className="panel-section">
-            <h3>Derived Summary</h3>
+            <h3>{t.derivedSummary}</h3>
             <dl className="summary-grid">
               <div>
-                <dt>Frame count</dt>
+                <dt>{t.frameCount}</dt>
                 <dd>{design.frameCount}</dd>
               </div>
               <div>
-                <dt>Extra H frames</dt>
+                <dt>{t.extraHFrames}</dt>
                 <dd>{design.extraSupportHFrameCount}</dd>
               </div>
               <div>
-                <dt>Boards / level</dt>
+                <dt>{t.boardsPerLevel}</dt>
                 <dd>{design.boardCountPerLevel}</dd>
               </div>
               <div>
-                <dt>Leg length</dt>
-                <dd>{formatInches(design.legVerticalLength)}</dd>
-              </div>
-              <div>
-                <dt>Rail length</dt>
-                <dd>{formatInches(design.sideRailLength)}</dd>
-              </div>
-              <div>
-                <dt>Actual clear span</dt>
+                <dt>{t.actualClearSpan}</dt>
                 <dd>{formatInches(design.actualClearSpan)}</dd>
               </div>
               <div>
-                <dt>Bottom rail clearance</dt>
+                <dt>{t.bottomRailClearance}</dt>
                 <dd>{formatInches(effectiveInputs.bottomRailClearance)}</dd>
               </div>
             </dl>
@@ -455,8 +818,8 @@ function App() {
         <section className="panel panel-preview">
           <div className="panel-section panel-header-row">
             <div>
-              <h2>Preview</h2>
-              <p className="muted">Orthographic SVG views for structure validation.</p>
+              <h2>{t.preview}</h2>
+              <p className="muted">{t.previewNote}</p>
             </div>
 
             <div className="preview-controls">
@@ -468,7 +831,7 @@ function App() {
                     className={mode === fillMode ? "active" : ""}
                     onClick={() => setFillMode(mode)}
                   >
-                    {mode === "solid" ? "solid" : "see-thru"}
+                    {mode === "solid" ? t.solid : t.seeThru}
                   </button>
                 ))}
               </div>
@@ -481,7 +844,13 @@ function App() {
                     className={mode === viewMode ? "active" : ""}
                     onClick={() => setViewMode(mode)}
                   >
-                    {mode}
+                    {mode === "top"
+                      ? t.top
+                      : mode === "side"
+                        ? t.side
+                        : mode === "front"
+                          ? t.front
+                          : t.assembly}
                   </button>
                 ))}
               </div>
@@ -494,6 +863,7 @@ function App() {
             fillMode={fillMode}
             colorTheme={colorTheme}
             issues={design.issues}
+            locale={locale}
             explodedAmount={explodedAmount}
             onExplodedAmountChange={setExplodedAmount}
             assemblyVisibility={assemblyVisibility}
@@ -514,11 +884,11 @@ function App() {
 
         <aside className="panel panel-results">
           <section className="panel-section">
-            <h2>Material Output</h2>
+            <h2>{t.materialOutput}</h2>
           </section>
 
           <section className="panel-section">
-            <h3>Shopping List</h3>
+            <h3>{t.shoppingList}</h3>
             <div className="shopping-table-wrap">
               <table className="shopping-table">
                 <colgroup>
@@ -529,23 +899,23 @@ function App() {
                 </colgroup>
                 <thead>
                   <tr>
-                    <th>Item</th>
-                    <th>Full Length</th>
-                    <th>Unit</th>
-                    <th>Qty</th>
+                    <th>{t.item}</th>
+                    <th>{t.fullLength}</th>
+                    <th>{t.unit}</th>
+                    <th>{t.qty}</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
                     <td>2x4 x 8ft</td>
                     <td>96"</td>
-                    <td>${boardUnitPrice.toFixed(2)} / board</td>
+                    <td>${boardUnitPrice.toFixed(2)} {t.perBoard}</td>
                     <td>{design.stockPlan.length}</td>
                   </tr>
                   <tr>
-                    <td>Screws</td>
+                    <td>{t.screws}</td>
                     <td>2-1/2 in</td>
-                    <td>${screwUnitPrice.toFixed(2)} / each</td>
+                    <td>${screwUnitPrice.toFixed(2)} {t.perEach}</td>
                     <td>{design.estimatedScrewCount}</td>
                   </tr>
                 </tbody>
@@ -553,24 +923,20 @@ function App() {
             </div>
             <div className="shopping-total-card">
               <div className="shopping-total-copy">
-                <span className="shopping-total-label">Total Estimate</span>
+                <span className="shopping-total-label">{t.totalEstimate}</span>
                 <span className="shopping-total-breakdown">
-                  Boards ${boardLineTotal.toFixed(2)} + Screws ${screwsLineTotal.toFixed(2)}
+                  {t.boardsCostBreakdown} ${boardLineTotal.toFixed(2)} + {t.screwsCostBreakdown} ${screwsLineTotal.toFixed(2)}
                 </span>
               </div>
               <strong>${shoppingGrandTotal.toFixed(2)}</strong>
             </div>
+            <p className="material-note">{t.shoppingNote}</p>
             <p className="material-note">
-              Shopping list cost uses optimized board count from Board Optimization plus estimated
-              screws.
+              {t.pricingReferencePrefix} ${boardUnitPrice.toFixed(2)} {t.pricingReferenceMiddle}{" "}
+              ${screwUnitPrice.toFixed(2)}{t.pricingReferenceSuffix}
             </p>
             <p className="material-note">
-              Default pricing reference: 8 ft 2x4 from Home Depot at ${boardUnitPrice.toFixed(2)}
-              {" "}per board and screws from Amazon at ${screwUnitPrice.toFixed(2)} per screw.
-              Home Depot prices vary by store, and Amazon prices may change over time.
-            </p>
-            <p className="material-note">
-              Sources:{" "}
+              {t.sources}{" "}
               <a
                 href="https://www.homedepot.com/p/2-in-x-4-in-x-96-in-Premium-Burrill-Fir-Stud-1000020053/206262176"
                 target="_blank"
@@ -591,13 +957,13 @@ function App() {
           </section>
 
           <section className="panel-section">
-            <h3>Cut List</h3>
+            <h3>{t.cutList}</h3>
             <table>
               <thead>
                 <tr>
-                  <th>Type</th>
-                  <th>Length</th>
-                  <th>Qty</th>
+                  <th>{t.type}</th>
+                  <th>{t.lengthColumn}</th>
+                  <th>{t.qty}</th>
                 </tr>
               </thead>
               <tbody>
@@ -624,7 +990,7 @@ function App() {
                             } as CSSProperties
                           }
                         />
-                        {part.label}
+                        {getLocalizedPartLabel(locale, part.key, frameMode, isTopSurface)}
                       </span>
                     </td>
                     <td>{formatInches(part.length)}</td>
@@ -637,32 +1003,32 @@ function App() {
 
           <section className="panel-section">
             <div className="panel-section-header panel-section-header-compact">
-              <h3>Board Optimization</h3>
-              <div className="board-optimization-legend" aria-label="Board optimization legend">
+              <h3>{t.boardOptimization}</h3>
+              <div className="board-optimization-legend" aria-label={t.boardOptimizationLegend}>
                 <span className="board-optimization-legend-item">
                   <span
                     className="board-optimization-legend-swatch"
                     style={{ backgroundColor: stockSegmentStyles[isTopSurface ? "top-board" : "shelf-board"].fill }}
                   />
-                  {isTopSurface ? "Top Boards" : "Shelf Boards"}
+                  {isTopSurface ? t.topBoards : t.shelfBoards}
                 </span>
                 <span className="board-optimization-legend-item">
                   <span
                     className="board-optimization-legend-swatch"
                     style={{ backgroundColor: stockSegmentStyles["vertical-leg"].fill }}
                   />
-                  Vertical Legs
+                  {t.verticalLegs}
                 </span>
                 <span className="board-optimization-legend-item">
                   <span
                     className="board-optimization-legend-swatch"
                     style={{ backgroundColor: stockSegmentStyles["side-rail"].fill }}
                   />
-                  Rails
+                  {t.rails}
                 </span>
                 <span className="board-optimization-legend-item">
                   <span className="board-optimization-legend-swatch board-optimization-legend-waste" />
-                  Waste
+                  {t.waste}
                 </span>
               </div>
             </div>
@@ -671,11 +1037,11 @@ function App() {
                 <article key={board.boardIndex} className="board-card">
                   <header>
                     <div className="board-card-title">
-                      <strong>Board {board.boardIndex}</strong>
-                      <span>96" full board</span>
+                      <strong>{t.boardN} {board.boardIndex}</strong>
+                      <span>{`96" ${t.fullBoard}`}</span>
                     </div>
                   </header>
-                  <div className="board-visual" aria-label={`Board ${board.boardIndex} cut layout`}>
+                  <div className="board-visual" aria-label={`${t.boardN} ${board.boardIndex} ${t.cutLayout}`}>
                     <div className="board-visual-track">
                         {board.cuts.map((cut, index) => {
                           const segmentStyle = stockSegmentStyles[cut.partKey] ?? {
@@ -693,7 +1059,7 @@ function App() {
                                 backgroundColor: segmentStyle.fill,
                                 borderColor: segmentStyle.stroke,
                               }}
-                              title={`${cut.label} ${formatInches(cut.length)}`}
+                              title={`${getLocalizedPartLabel(locale, cut.partKey, frameMode, isTopSurface)} ${formatInches(cut.length)}`}
                             >
                               {showSegmentLabel ? <span>{formatInches(cut.length)}</span> : null}
                             </div>
@@ -704,7 +1070,10 @@ function App() {
                             const wastePercent = (board.waste / STOCK_LENGTH) * 100;
                             let wasteLabel: string | null = null;
                             if (wastePercent >= 16) {
-                              wasteLabel = `${formatInches(board.waste)} waste`;
+                              wasteLabel =
+                                locale === "en"
+                                  ? `${formatInches(board.waste)} ${t.waste.toLowerCase()}`
+                                  : `${t.waste} ${formatInches(board.waste)}`;
                             } else if (wastePercent >= 10) {
                               wasteLabel = formatInches(board.waste);
                             }
@@ -713,7 +1082,7 @@ function App() {
                               <div
                                 className="board-visual-segment board-visual-waste"
                                 style={{ width: `${wastePercent}%` }}
-                                title={`Waste ${formatInches(board.waste)}`}
+                                title={`${t.waste} ${formatInches(board.waste)}`}
                               >
                                 {wasteLabel ? <span>{wasteLabel}</span> : null}
                               </div>
@@ -723,8 +1092,13 @@ function App() {
                     </div>
                   </div>
                   <small>
-                    Used {formatInches(board.usedLength)} including {board.kerfCount} kerf cuts ·{" "}
-                    {formatInches(board.waste)} waste
+                    {locale === "en"
+                      ? `Used ${formatInches(board.usedLength)}, including ${board.kerfCount} saw cuts. Scrap: ${formatInches(board.waste)}`
+                      : fillTemplate(t.usedIncludingKerfWaste, {
+                          used: formatInches(board.usedLength),
+                          kerfCount: board.kerfCount,
+                          waste: formatInches(board.waste),
+                        })}
                   </small>
                 </article>
               ))}
@@ -732,18 +1106,18 @@ function App() {
           </section>
 
           <section className="panel-section">
-            <h3>Waste Summary</h3>
+            <h3>{t.wasteSummary}</h3>
             <dl className="summary-grid">
               <div>
-                <dt>Boards Needed</dt>
+                <dt>{t.boardsNeeded}</dt>
                 <dd>{design.stockPlan.length}</dd>
               </div>
               <div>
-                <dt>Total Used</dt>
+                <dt>{t.totalUsed}</dt>
                 <dd>{formatInches(design.totalUsedLength)}</dd>
               </div>
               <div>
-                <dt>Total Waste</dt>
+                <dt>{t.totalWaste}</dt>
                 <dd>{formatInches(design.totalWaste)}</dd>
               </div>
             </dl>
@@ -753,14 +1127,18 @@ function App() {
       ) : (
         <main className="gallery-layout">
           <section className="panel panel-gallery">
+            <section className="panel-section gallery-promo">
+              <p className="gallery-promo-eyebrow">{galleryPromo.eyebrow}</p>
+              <h2>{galleryPromo.title}</h2>
+              <p className="gallery-promo-body">{galleryPromo.body}</p>
+              <p className="gallery-promo-body">{galleryPromo.body2}</p>
+            </section>
+
             <section className="panel-section">
               <div className="panel-section-header">
-                <h2>Build Gallery</h2>
+                <h2>{t.buildGallery}</h2>
               </div>
-              <p className="muted">
-                Example builds that use the same fixed 2x4 system. Pick one to load its parameters
-                into the planner.
-              </p>
+              <p className="muted">{t.buildGalleryNote}</p>
             </section>
 
             <section className="gallery-grid">
@@ -768,20 +1146,23 @@ function App() {
                 const buildInputs = build.inputs;
                 const shelfLevelsLabel =
                   buildInputs.furnitureType === "shelving"
-                    ? `Levels ${buildInputs.shelfLevelCount}`
+                    ? `${t.levels} ${buildInputs.shelfLevelCount}`
                     : null;
                 const frameModeLabel =
                   buildInputs.furnitureType === "shelving"
-                    ? `Frame ${buildInputs.frameMode === "h-frame" ? "H-frame" : "P-frame"}`
+                    ? `${t.frame} ${buildInputs.frameMode === "h-frame" ? t.hFrame : t.pFrame}`
                     : null;
+                const buildTitle = build.title[locale];
+                const buildDescription = build.description[locale];
+                const categoryLabel = build.category === "top-surface" ? t.bench : t.shelving;
 
                 return (
                   <article key={build.id} className="gallery-card">
                     <button
                       type="button"
                       className="gallery-image-button"
-                      onClick={() => setGalleryPreview({ src: build.imageSrc, title: build.title })}
-                      aria-label={`Preview ${build.title} photo`}
+                      onClick={() => setGalleryPreview({ id: build.id, src: build.imageSrc, title: buildTitle })}
+                      aria-label={fillTemplate(t.previewPhoto, { title: buildTitle })}
                     >
                       <div
                         className="gallery-image"
@@ -792,32 +1173,32 @@ function App() {
                     <div className="gallery-card-body">
                       <div className="gallery-card-header">
                         <div>
-                          <p className="gallery-card-eyebrow">{build.category}</p>
-                          <h3>{build.title}</h3>
+                          <p className="gallery-card-eyebrow">{categoryLabel}</p>
+                          <h3>{buildTitle}</h3>
                         </div>
                         <div className="gallery-card-actions">
                           <span
                             className={`gallery-chip ${
-                              build.category === "Bench" ? "gallery-chip-bench" : "gallery-chip-shelving"
+                              build.category === "top-surface" ? "gallery-chip-bench" : "gallery-chip-shelving"
                             }`}
                           >
-                            {build.category}
+                            {categoryLabel}
                           </span>
                           <button
                             type="button"
                             className="gallery-load-pill"
                             onClick={() => applyBuildPreset(build.inputs)}
                           >
-                            Load This Build
+                            {t.loadThisBuild}
                           </button>
                         </div>
                       </div>
-                      <p className="gallery-card-description">{build.description}</p>
+                      <p className="gallery-card-description">{buildDescription}</p>
                       <ul className="gallery-meta">
                         <li>{`L ${formatInches(buildInputs.length)}`}</li>
                         <li>{`D ${formatInches(buildInputs.depth)}`}</li>
                         <li>{`H ${formatInches(buildInputs.height)}`}</li>
-                        <li>{`Clearance ${formatInches(buildInputs.bottomRailClearance)}`}</li>
+                        <li>{`${t.clearance} ${formatInches(buildInputs.bottomRailClearance)}`}</li>
                         {shelfLevelsLabel ? <li>{shelfLevelsLabel}</li> : null}
                         {frameModeLabel ? <li>{frameModeLabel}</li> : null}
                       </ul>
@@ -834,7 +1215,7 @@ function App() {
           className="gallery-lightbox"
           role="dialog"
           aria-modal="true"
-          aria-label={`${galleryPreview.title} preview`}
+          aria-label={fillTemplate(t.imagePreview, { title: galleryPreview.title })}
           onClick={() => setGalleryPreview(null)}
         >
           <div className="gallery-lightbox-panel" onClick={(event) => event.stopPropagation()}>
@@ -844,9 +1225,9 @@ function App() {
                 type="button"
                 className="gallery-lightbox-close"
                 onClick={() => setGalleryPreview(null)}
-                aria-label="Close image preview"
+                aria-label={t.closeImagePreview}
               >
-                Close
+                {t.close}
               </button>
             </div>
             <img src={galleryPreview.src} alt={galleryPreview.title} className="gallery-lightbox-image" />
@@ -855,14 +1236,14 @@ function App() {
                 type="button"
                 className="gallery-load-button"
                 onClick={() => {
-                  const selectedBuild = GALLERY_BUILDS.find((build) => build.title === galleryPreview.title);
+                  const selectedBuild = GALLERY_BUILDS.find((build) => build.id === galleryPreview.id);
                   if (selectedBuild) {
                     applyBuildPreset(selectedBuild.inputs);
                   }
                   setGalleryPreview(null);
                 }}
               >
-                Load This Build
+                {t.loadThisBuild}
               </button>
             </div>
           </div>
@@ -878,6 +1259,7 @@ type PreviewProps = {
   fillMode: FillMode;
   colorTheme: ColorTheme;
   issues: string[];
+  locale: Locale;
   explodedAmount: number;
   onExplodedAmountChange: (value: number) => void;
   assemblyVisibility: AssemblyVisibility;
@@ -936,11 +1318,13 @@ function PreviewCanvas({
   fillMode,
   colorTheme,
   issues,
+  locale,
   explodedAmount,
   onExplodedAmountChange,
   assemblyVisibility,
   onAssemblyVisibilityChange,
 }: PreviewProps) {
+  const t = UI_STRINGS[locale];
   const width = 760;
   const height = 540;
   const panelMargin = 52;
@@ -1153,16 +1537,16 @@ function PreviewCanvas({
   const screwColor = "#5f2f1f";
   const legendItems = isTopSurface
     ? [
-        { label: "Top Boards", color: boardColor, kind: "board" as const },
-        { label: "Vertical Legs", color: legColor, kind: "leg" as const },
-        { label: "Rails", color: railColor, kind: "rail" as const },
-        { label: "Extra Support Frames", color: supportColor, kind: "support" as const },
+        { label: t.topBoards, color: boardColor, kind: "board" as const },
+        { label: t.verticalLegs, color: legColor, kind: "leg" as const },
+        { label: t.rails, color: railColor, kind: "rail" as const },
+        { label: t.extraSupportFrames, color: supportColor, kind: "support" as const },
       ]
     : [
-        { label: "Shelf Boards", color: boardColor, kind: "board" as const },
-        { label: "Vertical Legs", color: legColor, kind: "leg" as const },
-        { label: "Rails", color: railColor, kind: "rail" as const },
-        { label: "Extra Support Frames", color: supportColor, kind: "support" as const },
+        { label: t.shelfBoards, color: boardColor, kind: "board" as const },
+        { label: t.verticalLegs, color: legColor, kind: "leg" as const },
+        { label: t.rails, color: railColor, kind: "rail" as const },
+        { label: t.extraSupportFrames, color: supportColor, kind: "support" as const },
       ];
   const renderScrewMark = (cx: number, cy: number, key: string) => (
     <text
@@ -1281,7 +1665,7 @@ function PreviewCanvas({
 
   return (
     <div className="preview-canvas">
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${viewMode} view`}>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={locale === "en" ? `${viewMode} view` : `${t.preview}${t[viewMode]}`}>
         <defs>
           <pattern id="boardPattern" width="8" height="8" patternUnits="userSpaceOnUse">
             <circle cx="2" cy="2" r="0.8" fill={boardColor} />
@@ -1397,7 +1781,7 @@ function PreviewCanvas({
               y1={topFarDimY}
               x2={xRight}
               y2={topFarDimY}
-              label={`Length ${formatInches(inputs.length)}`}
+              label={fillTemplate(t.lengthLabel, { value: formatInches(inputs.length) })}
               textY={topFarDimTextY}
             />
             {showClearSpanDimension ? (
@@ -1406,7 +1790,7 @@ function PreviewCanvas({
                 y1={topNearDimY}
                 x2={x(BOARD_WIDTH + actualClearSpan)}
                 y2={topNearDimY}
-                label={`Clear Span ${formatInches(actualClearSpan)}`}
+                label={fillTemplate(t.clearSpanLabel, { value: formatInches(actualClearSpan) })}
                 textY={topNearDimTextY}
               />
             ) : null}
@@ -1415,7 +1799,7 @@ function PreviewCanvas({
               y1={yTop(0)}
               x2={leftDimX}
               y2={yTop(inputs.depth)}
-              label={`Depth ${formatInches(inputs.depth)}`}
+              label={fillTemplate(t.depthLabel, { value: formatInches(inputs.depth) })}
               textX={leftDimX - 12}
               textY={originY + contentHeight / 2 - 10}
               textAnchor="end"
@@ -1440,7 +1824,7 @@ function PreviewCanvas({
               className="datum-label"
               textAnchor="end"
             >
-              FLOOR 0"
+              {t.floorZero}
             </text>
 
             <rect
@@ -1569,7 +1953,7 @@ function PreviewCanvas({
                 y1={Math.max(capsuleY + 26, yBottom(inputs.height) - 18)}
                 x2={x(sameLevelBoardOffsets[1])}
                 y2={Math.max(capsuleY + 26, yBottom(inputs.height) - 18)}
-                label={`Board Gap ${formatInches(sameLevelBoardGap)}`}
+                label={fillTemplate(t.boardGapLabel, { value: formatInches(sameLevelBoardGap) })}
                 textY={Math.max(capsuleY + 16, yBottom(inputs.height) - 28)}
               />
             ) : null}
@@ -1579,7 +1963,7 @@ function PreviewCanvas({
               y1={showClearSpanDimension ? lowerFarDimY + 28 : lowerFarDimY}
               x2={xRight}
               y2={showClearSpanDimension ? lowerFarDimY + 28 : lowerFarDimY}
-              label={`Depth ${formatInches(inputs.depth)}`}
+              label={fillTemplate(t.depthLabel, { value: formatInches(inputs.depth) })}
               textY={showClearSpanDimension ? lowerFarDimTextY + 28 : lowerFarDimTextY}
             />
             <DimensionLine
@@ -1587,7 +1971,7 @@ function PreviewCanvas({
               y1={yBottom(0)}
               x2={leftDimX}
               y2={yBottom(inputs.height)}
-              label={`Height ${formatInches(inputs.height)}`}
+              label={fillTemplate(t.heightLabel, { value: formatInches(inputs.height) })}
               textX={leftDimX - 12}
               textY={originY + contentHeight / 2 - 10}
               textAnchor="end"
@@ -1597,7 +1981,7 @@ function PreviewCanvas({
               y1={showClearSpanDimension ? lowerNearDimY + 28 : lowerNearDimY}
               x2={x(inputs.depth - BOARD_THICKNESS)}
               y2={showClearSpanDimension ? lowerNearDimY + 28 : lowerNearDimY}
-              label={`Rail ${formatInches(inputs.depth - 2 * BOARD_THICKNESS)}`}
+              label={fillTemplate(t.railLabel, { value: formatInches(inputs.depth - 2 * BOARD_THICKNESS) })}
               textY={showClearSpanDimension ? lowerNearDimTextY + 28 : lowerNearDimTextY}
             />
             <DimensionLine
@@ -1605,7 +1989,7 @@ function PreviewCanvas({
               y1={yBottom(0)}
               x2={rightDimX}
               y2={yBottom(bottomRailBottom)}
-              label={`Clearance ${formatInches(bottomRailBottom)}`}
+              label={fillTemplate(t.clearanceLabel, { value: formatInches(bottomRailBottom) })}
               textX={rightDimX + 12}
               textY={yBottom(bottomRailBottom / 2) - 10}
               textAnchor="start"
@@ -1616,7 +2000,7 @@ function PreviewCanvas({
                 y1={yBottom(levelBottoms[0] + 2 * BOARD_THICKNESS)}
                 x2={Math.min(capsuleX + capsuleWidth - 24, rightDimX + 40)}
                 y2={yBottom(levelBottoms[1])}
-                label={`Level Gap ${formatInches(levelGap)}`}
+                label={fillTemplate(t.levelGapLabel, { value: formatInches(levelGap) })}
                 textX={Math.min(capsuleX + capsuleWidth - 12, rightDimX + 52)}
                 textY={(yBottom(levelBottoms[0] + 2 * BOARD_THICKNESS) + yBottom(levelBottoms[1])) / 2 - 10}
                 textAnchor="start"
@@ -1821,7 +2205,7 @@ function PreviewCanvas({
               className="datum-label"
               textAnchor="end"
             >
-              FLOOR 0"
+              {t.floorZero}
             </text>
 
             {isTopSurface
@@ -1932,7 +2316,7 @@ function PreviewCanvas({
               y1={lowerFarDimY}
               x2={xRight}
               y2={lowerFarDimY}
-              label={`Length ${formatInches(inputs.length)}`}
+              label={fillTemplate(t.lengthLabel, { value: formatInches(inputs.length) })}
               textY={lowerFarDimTextY}
             />
             {showClearSpanDimension ? (
@@ -1941,7 +2325,7 @@ function PreviewCanvas({
                 y1={lowerNearDimY}
                 x2={x(BOARD_WIDTH + actualClearSpan)}
                 y2={lowerNearDimY}
-                label={`Clear Span ${formatInches(actualClearSpan)}`}
+                label={fillTemplate(t.clearSpanLabel, { value: formatInches(actualClearSpan) })}
                 textY={lowerNearDimTextY}
               />
             ) : null}
@@ -1950,7 +2334,7 @@ function PreviewCanvas({
               y1={yBottom(0)}
               x2={leftDimX}
               y2={yBottom(inputs.height)}
-              label={`Height ${formatInches(inputs.height)}`}
+              label={fillTemplate(t.heightLabel, { value: formatInches(inputs.height) })}
               textX={leftDimX - 12}
               textY={originY + contentHeight / 2 - 10}
               textAnchor="end"
@@ -1969,15 +2353,15 @@ function PreviewCanvas({
               >
                 <div className="svg-control-card">
                   <fieldset className="assembly-visibility-controls">
-                    <legend>Dimensions</legend>
+                    <legend>{t.dimensions}</legend>
                     <div className="assembly-dimension-list">
-                      <span>{`Depth ${formatAssemblyDimension(inputs.depth)}`}</span>
-                      <span>{`Height ${formatAssemblyDimension(inputs.height)}`}</span>
-                      <span>{`Length ${formatAssemblyDimension(inputs.length)}`}</span>
+                      <span>{fillTemplate(t.heightLabel, { value: formatAssemblyDimension(inputs.height) })}</span>
+                      <span>{fillTemplate(t.lengthLabel, { value: formatAssemblyDimension(inputs.length) })}</span>
+                      <span>{fillTemplate(t.depthLabel, { value: formatAssemblyDimension(inputs.depth) })}</span>
                     </div>
                   </fieldset>
                   <fieldset className="assembly-visibility-controls">
-                    <legend>Show / Hide</legend>
+                    <legend>{t.showHide}</legend>
                     <label>
                       <input
                         type="checkbox"
@@ -1989,7 +2373,7 @@ function PreviewCanvas({
                           })
                         }
                       />
-                      <span>Boards</span>
+                      <span>{t.boards}</span>
                     </label>
                     <label>
                       <input
@@ -2002,7 +2386,7 @@ function PreviewCanvas({
                           })
                         }
                       />
-                      <span>Legs</span>
+                      <span>{t.legs}</span>
                     </label>
                     <label>
                       <input
@@ -2015,11 +2399,11 @@ function PreviewCanvas({
                           })
                         }
                       />
-                      <span>Rails</span>
+                      <span>{t.rails}</span>
                     </label>
                   </fieldset>
                   <label className="explode-slider">
-                    <span>Explode Amount</span>
+                    <span>{t.explodeAmount}</span>
                     <input
                       type="range"
                       min={0}
@@ -2042,7 +2426,7 @@ function PreviewCanvas({
           >
             <rect x="0" y="0" rx="10" ry="10" width="190" height="28" />
             <text x="95" y="18" textAnchor="middle">
-              Build Constraint Warning
+              {t.buildConstraintWarning}
             </text>
           </g>
         ) : null}
@@ -2075,7 +2459,7 @@ function PreviewCanvas({
           >
             xx
           </span>
-          <span>Screws</span>
+          <span>{t.screws}</span>
         </div>
       </div>
     </div>

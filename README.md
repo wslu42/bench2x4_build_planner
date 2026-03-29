@@ -6,6 +6,22 @@ It is designed around one constrained build system instead of freeform modeling:
 
 The current landing view opens on the gallery first, where example builds can be loaded directly into the planner.
 
+## Why am I building this
+I built this because I genuinely think the humble `2x4` is one of the most underrated furniture materials on the planet.
+
+It is structural lumber. Houses trust it to hold up roofs. That does not automatically make every 2x4 project elegant, but it does mean the raw material starts with a kind of honest, overqualified strength that most store-bought flat-pack furniture can only cosplay.
+
+It is also refreshingly low drama to work with. You are usually dealing with straight cuts, repeated lengths, and pieces you can carry without wrestling a giant sheet across your garage like it is a boss battle. No giant plywood panels. No melamine dust storm. No moment where you realize you cut directly into the floor because you forgot a sacrificial board underneath.
+
+I also like that 2x4 furniture ages with a little dignity. If you screw into it, ding it, drag it, overload it, or let it pick up a few scars, it still feels like the same object. A drywall hole feels like a mistake. A beat-up 2x4 feels like field data.
+
+And then there is the practical part: `2x4s` are cheap, available almost everywhere, and easy to replace. If a design works, great. If a design needs revision, you are not emotionally trapped by a pile of expensive sheet goods and exotic hardware. You just cut another board and keep iterating.
+
+There is also a materials philosophy here. A simple 2x4 build is basically wood plus screws. No laminated mystery layers. No plastic coating pretending to be wood grain. No glue-heavy panel products if you do not want them. Just a very understandable material system that is easy to inspect, easy to repair, and easy to explain.
+
+So this project is my nerdy attempt to make that system easier to use. I wanted a planner that helps you think in the native language of `2x4` builds: outer dimensions, repeated frames, predictable spans, cut lengths, stock usage, and a shopping list you can trust before you even leave the house.
+
+
 ## What It Supports
 
 - `Bench`
@@ -13,6 +29,7 @@ The current landing view opens on the gallery first, where example builds can be
 
 ## What It Does
 
+- Shows a bilingual gallery intro card above the example builds
 - Opens with a gallery of example builds and photos
 - Lets gallery photos open in a larger preview
 - Loads gallery presets directly into the planner

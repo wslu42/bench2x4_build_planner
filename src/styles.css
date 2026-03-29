@@ -40,6 +40,12 @@ select {
   margin-bottom: 24px;
 }
 
+.app-header-actions {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
 .eyebrow {
   margin: 0 0 6px;
   font-size: 0.8rem;
@@ -116,6 +122,39 @@ select {
   padding: 24px;
 }
 
+.gallery-promo {
+  padding: 22px 24px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(245, 194, 110, 0.16), transparent 34%),
+    rgba(255, 247, 237, 0.78);
+  border: 1px solid rgba(154, 120, 87, 0.14);
+}
+
+.gallery-promo-eyebrow {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8c5a2b;
+}
+
+.gallery-promo h2 {
+  max-width: 18ch;
+  margin-bottom: 12px;
+}
+
+.gallery-promo-body {
+  max-width: 78ch;
+  margin: 0;
+  color: #71553b;
+}
+
+.gallery-promo-body + .gallery-promo-body {
+  margin-top: 10px;
+}
+
 .panel-section + .panel-section {
   margin-top: 24px;
 }
@@ -143,17 +182,30 @@ select {
   align-items: start;
 }
 
+.parameterization-card {
+  padding: 14px 14px 16px;
+  border-radius: 22px;
+  background: rgba(255, 247, 237, 0.72);
+  border: 1px solid rgba(154, 120, 87, 0.12);
+}
+
 .parameterization-input-bundle {
-  display: grid;
-  gap: 12px;
+  width: 100%;
   min-width: 0;
 }
 
-.parameterization-input-bundle .muted {
-  max-width: 42rem;
+.parameterization-input-card {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
 }
 
-.parameterization-input-bundle .field-grid {
+.parameterization-input-card .muted {
+  max-width: 16rem;
+}
+
+.parameterization-input-card .field-grid {
   margin-top: 0;
 }
 
@@ -162,24 +214,20 @@ select {
   justify-items: end;
 }
 
-.parameterization-mode-stack {
-  display: grid;
-  justify-items: end;
-  gap: 10px;
+.parameterization-mode-card {
+  width: fit-content;
 }
 
-.parameterization-submode {
+.parameterization-mode-stack {
   display: grid;
   justify-items: end;
   gap: 6px;
 }
 
-.parameterization-submode span {
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #86654a;
+.parameterization-submode {
+  display: grid;
+  justify-items: end;
+  gap: 0;
 }
 
 .panel-controls .panel-section > h3 {
@@ -189,6 +237,85 @@ select {
 
 .segmented-mode {
   flex: 0 0 auto;
+}
+
+.icon-toggle {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+}
+
+.icon-toggle-caption {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #86654a;
+}
+
+.icon-toggle-track {
+  display: inline-grid;
+  grid-auto-flow: column;
+  gap: 6px;
+  align-items: center;
+  padding: 3px 5px;
+  background: #d3ccc8;
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.icon-toggle-button {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #7f6044;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.icon-toggle-button.active {
+  background: #fffdf8;
+  color: #2f241c;
+  box-shadow:
+    0 0 0 2px rgba(154, 120, 87, 0.18),
+    0 6px 18px rgba(83, 51, 22, 0.12);
+}
+
+.icon-toggle-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.icon-toggle-glyph span {
+  width: 1px;
+  height: 15px;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+.icon-toggle-labels {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: center;
+  gap: 12px;
+  min-width: 92px;
+}
+
+.icon-toggle-labels span {
+  font-size: 0.72rem;
+  color: #7f6044;
+  text-align: center;
+}
+
+.icon-toggle-labels span.active {
+  color: #2f241c;
+  font-weight: 700;
 }
 
 .muted {
@@ -209,11 +336,11 @@ select {
 }
 
 .field {
-  max-width: 240px;
+  max-width: 120px;
 }
 
 .field-compact {
-  max-width: 180px;
+  max-width: 90px;
 }
 
 .chip-list {
@@ -940,6 +1067,10 @@ th {
     flex-direction: column;
   }
 
+  .app-header-actions {
+    justify-items: start;
+  }
+
   .field,
   .field-compact {
     max-width: 240px;
@@ -989,6 +1120,14 @@ th {
   .parameterization-mode-stack,
   .parameterization-submode {
     justify-items: start;
+  }
+
+  .icon-toggle {
+    justify-items: start;
+  }
+
+  .icon-toggle-labels {
+    justify-content: start;
   }
 
   .preview-controls,
