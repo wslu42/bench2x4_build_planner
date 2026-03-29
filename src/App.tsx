@@ -38,6 +38,12 @@ type GalleryPreview = {
   title: string;
 };
 
+type AssemblyVisibility = {
+  boards: boolean;
+  legs: boolean;
+  rails: boolean;
+};
+
 type FieldProps = {
   label: string;
   value: number;
@@ -63,6 +69,22 @@ function NumberField({ label, value, min, step = 0.5, onChange }: FieldProps) {
 
 const DEFAULT_BOARD_UNIT_PRICE = 4.15;
 const DEFAULT_SCREW_UNIT_PRICE = 0.06;
+
+function formatAssemblyDimension(value: number): string {
+  if (value <= 24) {
+    return formatInches(value);
+  }
+
+  const feet = Math.floor(value / 12);
+  const inches = value - feet * 12;
+  const roundedInches = Math.round(inches * 1000) / 1000;
+
+  if (roundedInches === 0) {
+    return `${feet}'`;
+  }
+
+  return `${feet}' ${formatInches(roundedInches)}`;
+}
 
 const GALLERY_BUILDS: GalleryBuild[] = [
   {
@@ -106,7 +128,7 @@ const GALLERY_BUILDS: GalleryBuild[] = [
       height: 92,
       bottomRailClearance: 42.5,
       shelfLevelCount: 2,
-      frameMode: "h-frame",
+      frameMode: "p-frame",
     },
   },
   {
@@ -122,7 +144,7 @@ const GALLERY_BUILDS: GalleryBuild[] = [
       height: 92,
       bottomRailClearance: 13,
       shelfLevelCount: 3,
-      frameMode: "h-frame",
+      frameMode: "p-frame",
     },
   },
 ];
@@ -131,6 +153,12 @@ function App() {
   const [pageMode, setPageMode] = useState<PageMode>("gallery");
   const [furnitureType, setFurnitureType] = useState<FurnitureType>("top-surface");
   const [viewMode, setViewMode] = useState<ViewMode>("assembly");
+  const [explodedAmount, setExplodedAmount] = useState(0);
+  const [assemblyVisibility, setAssemblyVisibility] = useState<AssemblyVisibility>({
+    boards: true,
+    legs: true,
+    rails: true,
+  });
   const [length, setLength] = useState(72);
   const [depth, setDepth] = useState(14.5);
   const [height, setHeight] = useState(17.5);
@@ -240,18 +268,16 @@ function App() {
   };
 
   const ruleBadges = [
-    `2x4 actual size: ${BOARD_THICKNESS}" x ${BOARD_WIDTH}"`,
-    `Stock length: ${STOCK_LENGTH}"`,
+    `Actual 2x4: ${BOARD_THICKNESS}" × ${BOARD_WIDTH}"`,
+    `Stock board length: ${STOCK_LENGTH}"`,
     `Saw kerf: ${SAW_KERF}"`,
     `Max span: ${formatInches(effectiveInputs.maxSpan)}`,
     `Bottom rail clearance: ${formatInches(effectiveInputs.bottomRailClearance)}`,
-    `Floor plane used as vertical datum`,
-    `Fill mode: ${fillMode === "solid" ? "solid" : "transparent pattern"}`,
     isTopSurface
-      ? `Top boards derived from outer depth: ${design.boardCountPerLevel}`
-      : `Shelf boards per level derived from inner depth: ${design.boardCountPerLevel}`,
-    !isTopSurface ? `Frame mode: ${frameMode}` : null,
-  ];
+      ? `Top board count: ${design.boardCountPerLevel}`
+      : `Shelf board count per level: ${design.boardCountPerLevel}`,
+    !isTopSurface ? `Frame mode: ${frameMode === "h-frame" ? "H-frame" : "P-frame"}` : null,
+  ].filter((badge): badge is string => Boolean(badge));
 
   useEffect(() => {
     if (length !== effectiveInputs.length) {
@@ -320,73 +346,76 @@ function App() {
       <main className="workspace">
         <aside className="panel panel-controls">
           <section className="panel-section">
-            <div className="panel-section-header">
-              <h3>Parameterization</h3>
-              <div className="segmented segmented-mode" aria-label="Furniture Type">
-                {([
-                  { value: "top-surface", label: "Bench" },
-                  { value: "shelving", label: "Shelving" },
-                ] as const).map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={furnitureType === option.value ? "active" : ""}
-                    onClick={() => handleFurnitureTypeChange(option.value)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+            <div className="parameterization-bundles">
+              <div className="parameterization-input-bundle">
+                <h3>Parameterization</h3>
+                <p className="muted">
+                  All inputs are outer dimensions. Board counts are derived automatically.
+                </p>
+                <section className="field-grid">
+                  <NumberField label="Length (in)" value={length} min={12} onChange={setLength} />
+                  <NumberField label="Depth (in)" value={depth} min={3.5} onChange={setDepth} />
+                  <NumberField label="Height (in)" value={height} min={3.5} onChange={setHeight} />
+                  <NumberField label="Max Span (in)" value={maxSpan} min={6} step={6} onChange={setMaxSpan} />
+                  <NumberField
+                    label="Bottom Rail Clearance (in)"
+                    value={bottomRailClearance}
+                    min={0}
+                    onChange={setBottomRailClearance}
+                  />
+                  {!isTopSurface ? (
+                    <NumberField
+                      label="Shelf Levels"
+                      value={shelfLevelCount}
+                      min={1}
+                      step={1}
+                      onChange={setShelfLevelCount}
+                    />
+                  ) : null}
+                </section>
+              </div>
+
+              <div className="parameterization-mode-bundle">
+                <div className="parameterization-mode-stack">
+                  <div className="segmented segmented-mode" aria-label="Furniture Type">
+                    {([
+                      { value: "top-surface", label: "Bench" },
+                      { value: "shelving", label: "Shelving" },
+                    ] as const).map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={furnitureType === option.value ? "active" : ""}
+                        onClick={() => handleFurnitureTypeChange(option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                  {!isTopSurface ? (
+                    <div className="parameterization-submode">
+                      <span>Frame Mode</span>
+                      <div className="segmented segmented-mode" aria-label="Frame Mode">
+                        {([
+                          { value: "h-frame", label: "H-frame" },
+                          { value: "p-frame", label: "P-frame" },
+                        ] as const).map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className={frameMode === option.value ? "active" : ""}
+                            onClick={() => setFrameMode(option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
-            <p className="muted">
-              All inputs are outer dimensions. Board counts are derived automatically.
-            </p>
           </section>
-
-          <section className="field-grid">
-            <NumberField label="Length (in)" value={length} min={12} onChange={setLength} />
-            <NumberField label="Depth (in)" value={depth} min={3.5} onChange={setDepth} />
-            <NumberField label="Height (in)" value={height} min={3.5} onChange={setHeight} />
-            <NumberField label="Max Span (in)" value={maxSpan} min={6} step={6} onChange={setMaxSpan} />
-            <NumberField
-              label="Bottom Rail Clearance (in)"
-              value={bottomRailClearance}
-              min={0}
-              onChange={setBottomRailClearance}
-            />
-            {!isTopSurface ? (
-              <NumberField
-                label="Shelf Levels"
-                value={shelfLevelCount}
-                min={1}
-                step={1}
-                onChange={setShelfLevelCount}
-              />
-            ) : null}
-          </section>
-
-          {!isTopSurface ? (
-            <section className="panel-section">
-              <div className="panel-section-header">
-                <h3>Frame Mode</h3>
-              </div>
-              <div className="segmented" aria-label="Frame Mode">
-                {([
-                  { value: "h-frame", label: "H-frame" },
-                  { value: "p-frame", label: "P-frame" },
-                ] as const).map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={frameMode === option.value ? "active" : ""}
-                    onClick={() => setFrameMode(option.value)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </section>
-          ) : null}
 
           <section className="panel-section">
             <h3>Derived Summary</h3>
@@ -439,7 +468,7 @@ function App() {
                     className={mode === fillMode ? "active" : ""}
                     onClick={() => setFillMode(mode)}
                   >
-                    {mode === "solid" ? "solid" : "pattern"}
+                    {mode === "solid" ? "solid" : "see-thru"}
                   </button>
                 ))}
               </div>
@@ -465,6 +494,10 @@ function App() {
             fillMode={fillMode}
             colorTheme={colorTheme}
             issues={design.issues}
+            explodedAmount={explodedAmount}
+            onExplodedAmountChange={setExplodedAmount}
+            assemblyVisibility={assemblyVisibility}
+            onAssemblyVisibilityChange={setAssemblyVisibility}
           />
 
           <section className="panel-section">
@@ -486,45 +519,45 @@ function App() {
 
           <section className="panel-section">
             <h3>Shopping List</h3>
-            <table className="shopping-table">
-              <colgroup>
-                <col style={{ width: "26%" }} />
-                <col style={{ width: "22%" }} />
-                <col style={{ width: "31%" }} />
-                <col style={{ width: "9%" }} />
-                <col style={{ width: "12%" }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Full Length</th>
-                  <th>Unit</th>
-                  <th>Qty</th>
-                  <th>Cost</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>2x4 x 8ft</td>
-                  <td>96"</td>
-                  <td>${boardUnitPrice.toFixed(2)} / board</td>
-                  <td>{design.stockPlan.length}</td>
-                  <td>${boardLineTotal.toFixed(2)}</td>
-                </tr>
-                <tr>
-                  <td>Screws</td>
-                  <td>2-1/2 in</td>
-                  <td>${screwUnitPrice.toFixed(2)} / each</td>
-                  <td>{design.estimatedScrewCount}</td>
-                  <td>${screwsLineTotal.toFixed(2)}</td>
-                </tr>
-              </tbody>
-            </table>
-            <div className="shopping-total-row">
-              <span className="shopping-total-label">Total Estimate</span>
-              <span className="shopping-total-spacer" aria-hidden="true" />
-              <span className="shopping-total-spacer" aria-hidden="true" />
-              <span className="shopping-total-spacer" aria-hidden="true" />
+            <div className="shopping-table-wrap">
+              <table className="shopping-table">
+                <colgroup>
+                  <col style={{ width: "28%" }} />
+                  <col style={{ width: "22%" }} />
+                  <col style={{ width: "36%" }} />
+                  <col style={{ width: "14%" }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Full Length</th>
+                    <th>Unit</th>
+                    <th>Qty</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>2x4 x 8ft</td>
+                    <td>96"</td>
+                    <td>${boardUnitPrice.toFixed(2)} / board</td>
+                    <td>{design.stockPlan.length}</td>
+                  </tr>
+                  <tr>
+                    <td>Screws</td>
+                    <td>2-1/2 in</td>
+                    <td>${screwUnitPrice.toFixed(2)} / each</td>
+                    <td>{design.estimatedScrewCount}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="shopping-total-card">
+              <div className="shopping-total-copy">
+                <span className="shopping-total-label">Total Estimate</span>
+                <span className="shopping-total-breakdown">
+                  Boards ${boardLineTotal.toFixed(2)} + Screws ${screwsLineTotal.toFixed(2)}
+                </span>
+              </div>
               <strong>${shoppingGrandTotal.toFixed(2)}</strong>
             </div>
             <p className="material-note">
@@ -737,6 +770,10 @@ function App() {
                   buildInputs.furnitureType === "shelving"
                     ? `Levels ${buildInputs.shelfLevelCount}`
                     : null;
+                const frameModeLabel =
+                  buildInputs.furnitureType === "shelving"
+                    ? `Frame ${buildInputs.frameMode === "h-frame" ? "H-frame" : "P-frame"}`
+                    : null;
 
                 return (
                   <article key={build.id} className="gallery-card">
@@ -782,6 +819,7 @@ function App() {
                         <li>{`H ${formatInches(buildInputs.height)}`}</li>
                         <li>{`Clearance ${formatInches(buildInputs.bottomRailClearance)}`}</li>
                         {shelfLevelsLabel ? <li>{shelfLevelsLabel}</li> : null}
+                        {frameModeLabel ? <li>{frameModeLabel}</li> : null}
                       </ul>
                     </div>
                   </article>
@@ -840,6 +878,10 @@ type PreviewProps = {
   fillMode: FillMode;
   colorTheme: ColorTheme;
   issues: string[];
+  explodedAmount: number;
+  onExplodedAmountChange: (value: number) => void;
+  assemblyVisibility: AssemblyVisibility;
+  onAssemblyVisibilityChange: (value: AssemblyVisibility) => void;
 };
 
 type DimensionLineProps = {
@@ -894,28 +936,36 @@ function PreviewCanvas({
   fillMode,
   colorTheme,
   issues,
+  explodedAmount,
+  onExplodedAmountChange,
+  assemblyVisibility,
+  onAssemblyVisibilityChange,
 }: PreviewProps) {
   const width = 760;
   const height = 540;
   const panelMargin = 52;
+  const isAssemblyLikeView = viewMode === "assembly";
   const capsuleX = panelMargin;
-  const capsuleY = 86;
+  const capsuleY = 34;
   const capsuleWidth = width - panelMargin * 2;
-  const capsuleHeight = height - capsuleY - 32;
+  const capsuleHeight = height - capsuleY - 24;
   const annotationInsetLeft = 108;
-  const annotationInsetRight = 92;
-  const annotationInsetTop = 56;
-  const annotationInsetBottom = 138;
-  const annotationFrameX = capsuleX + annotationInsetLeft;
-  const annotationFrameY = capsuleY + annotationInsetTop;
-  const annotationFrameWidth = capsuleWidth - annotationInsetLeft - annotationInsetRight;
-  const annotationFrameHeight = capsuleHeight - annotationInsetTop - annotationInsetBottom;
+  const annotationInsetTop = 40;
+  const annotationInsetBottom = 124;
   const isTopSurface = inputs.furnitureType === "top-surface";
   const { frameCount, framePositions, actualClearSpan } = deriveFrameLayout(
     inputs.length,
     inputs.maxSpan,
   );
   const shelfLevels = inputs.furnitureType === "shelving" ? inputs.shelfLevelCount : 1;
+  const explodeFactor = viewMode === "assembly" ? (explodedAmount / 100) * 5 : 0;
+  const assemblySidebarWidth = 190;
+  const effectiveAnnotationInsetLeft = isAssemblyLikeView ? 76 : annotationInsetLeft;
+  const annotationInsetRight = isAssemblyLikeView ? assemblySidebarWidth + 28 : 92;
+  const annotationFrameX = capsuleX + effectiveAnnotationInsetLeft;
+  const annotationFrameY = capsuleY + annotationInsetTop;
+  const annotationFrameWidth = capsuleWidth - effectiveAnnotationInsetLeft - annotationInsetRight;
+  const annotationFrameHeight = capsuleHeight - annotationInsetTop - annotationInsetBottom;
 
   const boardCount =
     inputs.furnitureType === "top-surface"
@@ -925,20 +975,23 @@ function PreviewCanvas({
   const viewWidth =
     viewMode === "side"
       ? inputs.depth
-      : viewMode === "assembly"
+      : isAssemblyLikeView
         ? inputs.length + inputs.depth * 0.72
         : inputs.length;
   const viewHeight =
     viewMode === "top"
       ? inputs.depth
-      : viewMode === "assembly"
+      : isAssemblyLikeView
         ? inputs.height + inputs.depth * 0.44 + BOARD_THICKNESS
         : inputs.height;
-  const scale = Math.min(annotationFrameWidth / viewWidth, annotationFrameHeight / viewHeight);
+  const assemblyScaleFactor = isAssemblyLikeView ? 0.94 : 1;
+  const scale = Math.min(annotationFrameWidth / viewWidth, annotationFrameHeight / viewHeight) * assemblyScaleFactor;
   const contentWidth = viewWidth * scale;
   const contentHeight = viewHeight * scale;
-  const originX = annotationFrameX + (annotationFrameWidth - contentWidth) / 2;
-  const originY = annotationFrameY + (annotationFrameHeight - contentHeight) / 2;
+  const assemblyObjectShiftX = isAssemblyLikeView ? -24 : 0;
+  const assemblyObjectShiftY = isAssemblyLikeView ? 34 : 0;
+  const originX = annotationFrameX + (annotationFrameWidth - contentWidth) / 2 + assemblyObjectShiftX;
+  const originY = annotationFrameY + (annotationFrameHeight - contentHeight) / 2 + assemblyObjectShiftY;
 
   const x = (value: number) => originX + value * scale;
   const yTop = (value: number) => originY + value * scale;
@@ -1032,7 +1085,7 @@ function PreviewCanvas({
     supportStroke,
   } = palette;
   const datumColor = "#8b7357";
-  const assemblyUsesSolidStroke = viewMode === "assembly" && fillMode === "pattern";
+  const assemblyUsesSolidStroke = isAssemblyLikeView && fillMode === "pattern";
   const boardLineColor = fillMode === "pattern" && !assemblyUsesSolidStroke ? boardColor : boardStroke;
   const legLineColor = fillMode === "pattern" && !assemblyUsesSolidStroke ? legColor : legStroke;
   const railLineColor = fillMode === "pattern" && !assemblyUsesSolidStroke ? railColor : railStroke;
@@ -1085,10 +1138,17 @@ function PreviewCanvas({
       : 0;
   const rearLegBaseHeight =
     !isTopSurface && inputs.frameMode === "p-frame" && levelBottoms.length > 0
-      ? levelBottoms[0] + 2 * BOARD_THICKNESS
+      ? bottomRailBottom
       : 0;
   const rearLegVisibleHeight = Math.max(0, visibleLegHeight - rearLegBaseHeight);
-  const assemblyRearLegHeight = Math.max(0, assemblyLegHeight - rearLegBaseHeight);
+  const assemblyRearLegBaseHeight =
+    rearLegBaseHeight + (!isTopSurface && inputs.frameMode === "p-frame" ? BOARD_THICKNESS : 0);
+  const assemblyRearLegHeight = Math.max(0, assemblyLegHeight - assemblyRearLegBaseHeight);
+  const explodedBoardLift = viewMode === "assembly" ? BOARD_THICKNESS * 2 * explodeFactor : 0;
+  const explodedRailLift = viewMode === "assembly" ? BOARD_THICKNESS * 0.9 * explodeFactor : 0;
+  const explodedLowerRailDrop = viewMode === "assembly" ? BOARD_THICKNESS * 0.8 * explodeFactor : 0;
+  const explodedFrontSpread = viewMode === "assembly" ? BOARD_THICKNESS * 1.1 * explodeFactor : 0;
+  const explodedBackSpread = viewMode === "assembly" ? BOARD_THICKNESS * 1.1 * explodeFactor : 0;
 
   const screwColor = "#5f2f1f";
   const legendItems = isTopSurface
@@ -1142,7 +1202,7 @@ function PreviewCanvas({
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
   const assemblyPatternAlpha =
-    viewMode === "assembly" && fillMode === "pattern"
+    isAssemblyLikeView && fillMode === "pattern"
       ? (faceColor: string) =>
           faceColor === railColor ? 1 : 0.5
       : () => 1;
@@ -1153,6 +1213,10 @@ function PreviewCanvas({
     x: originX + (px + pz * assemblySkewX) * scale,
     y: originY + contentHeight - py * scale - pz * assemblySkewY * scale,
   });
+  const assemblyFrontBottomLeft = assemblyProject(0, 0, inputs.depth);
+  const assemblyControlWidth = 184;
+  const assemblyControlX = capsuleX + capsuleWidth - assemblySidebarWidth + (assemblySidebarWidth - assemblyControlWidth) / 2;
+  const assemblyControlY = capsuleY + (capsuleHeight - 202) / 2 - 20;
 
   const renderPrism = (
     key: string,
@@ -1204,6 +1268,15 @@ function PreviewCanvas({
       </g>
     );
   };
+  const offsetPrism = (
+    prism: { x: number; y: number; z: number; width: number; height: number; depth: number },
+    offsets: { x?: number; y?: number; z?: number },
+  ) => ({
+    ...prism,
+    x: prism.x + (offsets.x ?? 0),
+    y: prism.y + (offsets.y ?? 0),
+    z: prism.z + (offsets.z ?? 0),
+  });
 
   return (
     <div className="preview-canvas">
@@ -1551,85 +1624,93 @@ function PreviewCanvas({
           </>
         ) : null}
 
-        {viewMode === "assembly" ? (
+        {isAssemblyLikeView ? (
           <>
             {isTopSurface ? (
               <>
-                {frameLeftPositions.map((left, index) =>
-                  renderPrism(
-                    `assembly-back-leg-${index}`,
-                    {
-                      x: left,
-                      y: 0,
-                      z: inputs.depth - BOARD_THICKNESS,
-                      width: BOARD_WIDTH,
-                      height: assemblyLegHeight,
-                      depth: BOARD_THICKNESS,
-                    },
-                    index === 0 || index === frameCount - 1 ? legColor : supportColor,
-                    index === 0 || index === frameCount - 1 ? legLineColor : supportLineColor,
-                  ),
-                )}
-                {frameLeftPositions.map((left, index) => (
-                  <g key={`assembly-bench-rails-${index}`}>
-                    {renderPrism(
-                      `assembly-top-rail-${index}`,
-                      {
-                        x: left,
-                        y: inputs.height - 2 * BOARD_THICKNESS,
-                        z: BOARD_THICKNESS,
-                        width: BOARD_WIDTH,
-                        height: BOARD_THICKNESS,
-                        depth: inputs.depth - 2 * BOARD_THICKNESS,
-                      },
-                      railColor,
-                      railLineColor,
-                    )}
-                    {renderPrism(
-                      `assembly-bottom-rail-${index}`,
-                      {
-                        x: left,
-                        y: bottomRailBottom,
-                        z: BOARD_THICKNESS,
-                        width: BOARD_WIDTH,
-                        height: BOARD_THICKNESS,
-                        depth: inputs.depth - 2 * BOARD_THICKNESS,
-                      },
-                      railColor,
-                      railLineColor,
-                    )}
-                  </g>
-                ))}
-                {frameLeftPositions.map((left, index) =>
-                  renderPrism(
-                    `assembly-front-leg-${index}`,
-                    {
-                      x: left,
-                      y: 0,
-                      z: 0,
-                      width: BOARD_WIDTH,
-                      height: assemblyLegHeight,
-                      depth: BOARD_THICKNESS,
-                    },
-                    index === 0 || index === frameCount - 1 ? legColor : supportColor,
-                    index === 0 || index === frameCount - 1 ? legLineColor : supportLineColor,
-                  ),
-                )}
-                {[...topBoardSideOffsets].reverse().map((offset, boardIndex) =>
-                  renderPrism(
-                    `assembly-top-board-${boardIndex}`,
-                    {
-                      x: 0,
-                      y: inputs.height - BOARD_THICKNESS,
-                      z: offset,
-                      width: inputs.length,
-                      height: BOARD_THICKNESS,
-                      depth: BOARD_WIDTH,
-                    },
-                    boardColor,
-                    boardLineColor,
-                  ),
-                )}
+                {assemblyVisibility.legs
+                  ? frameLeftPositions.map((left, index) =>
+                      renderPrism(
+                        `assembly-back-leg-${index}`,
+                        offsetPrism({
+                          x: left,
+                          y: 0,
+                          z: inputs.depth - BOARD_THICKNESS,
+                          width: BOARD_WIDTH,
+                          height: assemblyLegHeight,
+                          depth: BOARD_THICKNESS,
+                        }, { z: explodedBackSpread }),
+                        index === 0 || index === frameCount - 1 ? legColor : supportColor,
+                        index === 0 || index === frameCount - 1 ? legLineColor : supportLineColor,
+                      ),
+                    )
+                  : null}
+                {assemblyVisibility.rails
+                  ? frameLeftPositions.map((left, index) => (
+                      <g key={`assembly-bench-rails-${index}`}>
+                        {renderPrism(
+                          `assembly-top-rail-${index}`,
+                          offsetPrism({
+                            x: left,
+                            y: inputs.height - 2 * BOARD_THICKNESS,
+                            z: BOARD_THICKNESS,
+                            width: BOARD_WIDTH,
+                            height: BOARD_THICKNESS,
+                            depth: inputs.depth - 2 * BOARD_THICKNESS,
+                          }, { y: explodedRailLift }),
+                          railColor,
+                          railLineColor,
+                        )}
+                        {renderPrism(
+                          `assembly-bottom-rail-${index}`,
+                          offsetPrism({
+                            x: left,
+                            y: bottomRailBottom,
+                            z: BOARD_THICKNESS,
+                            width: BOARD_WIDTH,
+                            height: BOARD_THICKNESS,
+                            depth: inputs.depth - 2 * BOARD_THICKNESS,
+                          }, { y: -explodedLowerRailDrop }),
+                          railColor,
+                          railLineColor,
+                        )}
+                      </g>
+                    ))
+                  : null}
+                {assemblyVisibility.legs
+                  ? frameLeftPositions.map((left, index) =>
+                      renderPrism(
+                        `assembly-front-leg-${index}`,
+                        offsetPrism({
+                          x: left,
+                          y: 0,
+                          z: 0,
+                          width: BOARD_WIDTH,
+                          height: assemblyLegHeight,
+                          depth: BOARD_THICKNESS,
+                        }, { z: -explodedFrontSpread }),
+                        index === 0 || index === frameCount - 1 ? legColor : supportColor,
+                        index === 0 || index === frameCount - 1 ? legLineColor : supportLineColor,
+                      ),
+                    )
+                  : null}
+                {assemblyVisibility.boards
+                  ? [...topBoardSideOffsets].reverse().map((offset, boardIndex) =>
+                      renderPrism(
+                        `assembly-top-board-${boardIndex}`,
+                        offsetPrism({
+                          x: 0,
+                          y: inputs.height - BOARD_THICKNESS,
+                          z: offset,
+                          width: inputs.length,
+                          height: BOARD_THICKNESS,
+                          depth: BOARD_WIDTH,
+                        }, { y: explodedBoardLift }),
+                        boardColor,
+                        boardLineColor,
+                      ),
+                    )
+                  : null}
               </>
             ) : (
               <>
@@ -1637,75 +1718,83 @@ function PreviewCanvas({
                   const topLevelIndex = levelBottoms.length - 1;
                   const renderShelfLevel = (bottom: number, levelIndex: number) => (
                     <g key={`assembly-shelf-level-${levelIndex}`}>
-                      {frameLeftPositions.map((left, frameIndex) =>
-                        renderPrism(
-                          `assembly-shelf-rail-${levelIndex}-${frameIndex}`,
-                          {
-                            x: left,
-                            y: bottom + BOARD_THICKNESS,
-                            z: BOARD_THICKNESS,
-                            width: BOARD_WIDTH,
-                            height: BOARD_THICKNESS,
-                            depth: inputs.depth - 2 * BOARD_THICKNESS,
-                          },
-                          railColor,
-                          railLineColor,
-                        ),
-                      )}
-                      {[...shelfBoardOffsets].reverse().map((offset, boardIndex) =>
-                        renderPrism(
-                          `assembly-shelf-board-${levelIndex}-${boardIndex}`,
-                          {
-                            x: 0,
-                            y: bottom + 2 * BOARD_THICKNESS,
-                            z: offset,
-                            width: inputs.length,
-                            height: BOARD_THICKNESS,
-                            depth: BOARD_WIDTH,
-                          },
-                          boardColor,
-                          boardLineColor,
-                        ),
-                      )}
+                      {assemblyVisibility.rails
+                        ? frameLeftPositions.map((left, frameIndex) =>
+                            renderPrism(
+                              `assembly-shelf-rail-${levelIndex}-${frameIndex}`,
+                              offsetPrism({
+                                x: left,
+                                y: bottom + BOARD_THICKNESS,
+                                z: BOARD_THICKNESS,
+                                width: BOARD_WIDTH,
+                                height: BOARD_THICKNESS,
+                                depth: inputs.depth - 2 * BOARD_THICKNESS,
+                              }, { y: explodedRailLift }),
+                              railColor,
+                              railLineColor,
+                            ),
+                          )
+                        : null}
+                      {assemblyVisibility.boards
+                        ? [...shelfBoardOffsets].reverse().map((offset, boardIndex) =>
+                            renderPrism(
+                              `assembly-shelf-board-${levelIndex}-${boardIndex}`,
+                              offsetPrism({
+                                x: 0,
+                                y: bottom + 2 * BOARD_THICKNESS,
+                                z: offset,
+                                width: inputs.length,
+                                height: BOARD_THICKNESS,
+                                depth: BOARD_WIDTH,
+                              }, { y: explodedBoardLift }),
+                              boardColor,
+                              boardLineColor,
+                            ),
+                          )
+                        : null}
                     </g>
                   );
 
                   return (
                     <>
-                      {frameLeftPositions.map((left, index) =>
-                        renderPrism(
-                          `assembly-shelf-back-leg-${index}`,
-                          {
-                            x: left,
-                            y: rearLegBaseHeight,
-                            z: inputs.depth - BOARD_THICKNESS,
-                            width: BOARD_WIDTH,
-                            height: assemblyRearLegHeight,
-                            depth: BOARD_THICKNESS,
-                          },
-                          index === 0 || index === frameCount - 1 ? legColor : supportColor,
-                          index === 0 || index === frameCount - 1 ? legLineColor : supportLineColor,
-                        ),
-                      )}
+                      {assemblyVisibility.legs
+                        ? frameLeftPositions.map((left, index) =>
+                            renderPrism(
+                              `assembly-shelf-back-leg-${index}`,
+                              offsetPrism({
+                                x: left,
+                                y: assemblyRearLegBaseHeight,
+                                z: inputs.depth - BOARD_THICKNESS,
+                                width: BOARD_WIDTH,
+                                height: assemblyRearLegHeight,
+                                depth: BOARD_THICKNESS,
+                              }, { z: explodedBackSpread }),
+                              index === 0 || index === frameCount - 1 ? legColor : supportColor,
+                              index === 0 || index === frameCount - 1 ? legLineColor : supportLineColor,
+                            ),
+                          )
+                        : null}
                       {levelBottoms
                         .slice(0, Math.max(0, topLevelIndex))
                         .map((bottom, levelIndex) => renderShelfLevel(bottom, levelIndex))}
                       {topLevelIndex >= 0 ? renderShelfLevel(levelBottoms[topLevelIndex], topLevelIndex) : null}
-                      {frameLeftPositions.map((left, index) =>
-                        renderPrism(
-                          `assembly-shelf-front-leg-${index}`,
-                          {
-                            x: left,
-                            y: 0,
-                            z: 0,
-                            width: BOARD_WIDTH,
-                            height: assemblyLegHeight,
-                            depth: BOARD_THICKNESS,
-                          },
-                          index === 0 || index === frameCount - 1 ? legColor : supportColor,
-                          index === 0 || index === frameCount - 1 ? legLineColor : supportLineColor,
-                        ),
-                      )}
+                      {assemblyVisibility.legs
+                        ? frameLeftPositions.map((left, index) =>
+                            renderPrism(
+                              `assembly-shelf-front-leg-${index}`,
+                              offsetPrism({
+                                x: left,
+                                y: 0,
+                                z: 0,
+                                width: BOARD_WIDTH,
+                                height: assemblyLegHeight,
+                                depth: BOARD_THICKNESS,
+                              }, { z: -explodedFrontSpread }),
+                              index === 0 || index === frameCount - 1 ? legColor : supportColor,
+                              index === 0 || index === frameCount - 1 ? legLineColor : supportLineColor,
+                            ),
+                          )
+                        : null}
                     </>
                   );
                 })()}
@@ -1868,23 +1957,94 @@ function PreviewCanvas({
           </>
         ) : null}
 
-        <text x={capsuleX} y={38} className="svg-label">
-          {viewMode.toUpperCase()} VIEW
-        </text>
+        {isAssemblyLikeView ? (
+          <>
+            {viewMode === "assembly" ? (
+              <foreignObject
+                x={assemblyControlX}
+                y={assemblyControlY}
+                width={assemblyControlWidth}
+                height={202}
+              >
+                <div className="svg-control-card">
+                  <fieldset className="assembly-visibility-controls">
+                    <legend>Dimensions</legend>
+                    <div className="assembly-dimension-list">
+                      <span>{`Depth ${formatAssemblyDimension(inputs.depth)}`}</span>
+                      <span>{`Height ${formatAssemblyDimension(inputs.height)}`}</span>
+                      <span>{`Length ${formatAssemblyDimension(inputs.length)}`}</span>
+                    </div>
+                  </fieldset>
+                  <fieldset className="assembly-visibility-controls">
+                    <legend>Show / Hide</legend>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={assemblyVisibility.boards}
+                        onChange={(event) =>
+                          onAssemblyVisibilityChange({
+                            ...assemblyVisibility,
+                            boards: event.target.checked,
+                          })
+                        }
+                      />
+                      <span>Boards</span>
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={assemblyVisibility.legs}
+                        onChange={(event) =>
+                          onAssemblyVisibilityChange({
+                            ...assemblyVisibility,
+                            legs: event.target.checked,
+                          })
+                        }
+                      />
+                      <span>Legs</span>
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={assemblyVisibility.rails}
+                        onChange={(event) =>
+                          onAssemblyVisibilityChange({
+                            ...assemblyVisibility,
+                            rails: event.target.checked,
+                          })
+                        }
+                      />
+                      <span>Rails</span>
+                    </label>
+                  </fieldset>
+                  <label className="explode-slider">
+                    <span>Explode Amount</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={150}
+                      step={5}
+                      value={explodedAmount}
+                      onChange={(event) => onExplodedAmountChange(Number(event.target.value))}
+                    />
+                  </label>
+                </div>
+              </foreignObject>
+            ) : null}
+          </>
+        ) : null}
+
         {issues.length > 0 ? (
-          <g className="svg-warning-pill" transform={`translate(${capsuleX + 132}, 20)`}>
-            <rect x="0" y="0" rx="10" ry="10" width="152" height="28" />
-            <text x="76" y="18" textAnchor="middle">
-              Collision Warning
+          <g
+            className="svg-warning-pill"
+            transform={`translate(${capsuleX + 18}, ${capsuleY + 16})`}
+          >
+            <rect x="0" y="0" rx="10" ry="10" width="190" height="28" />
+            <text x="95" y="18" textAnchor="middle">
+              Build Constraint Warning
             </text>
           </g>
         ) : null}
-        <text x={width - capsuleX} y={38} className="svg-label" textAnchor="end">
-          L {formatInches(inputs.length)} / D {formatInches(inputs.depth)} / H {formatInches(inputs.height)}
-        </text>
-        <text x={width - capsuleX} y={60} className="svg-label" textAnchor="end">
-          Bottom Rail Clearance {formatInches(bottomRailBottom)}
-        </text>
       </svg>
 
       <div className="preview-legend">

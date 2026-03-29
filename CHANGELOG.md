@@ -21,11 +21,15 @@ All notable changes to this project will be documented in this file.
 - Landing page now opens on `Gallery`
 - Bench and Shelving defaults refined for height, clearance, max span, gallery presets, and default view
 - Material output reorganized into Shopping List, Cut List, Board Optimization, and Waste Summary
-- Preview layout, legends, dimension labels, and gallery card interactions refined
+- Preview layout, legends, dimension labels, in-canvas warning placement, and gallery card interactions refined
 - Planner and gallery-loaded builds now open directly into `Assembly` view with `solid` fill
-- `Assembly` pattern mode now uses 50% transparency for orange boards and tan legs while keeping blue rails opaque
+- Preview fill toggle now uses `solid / see-thru`
+- `Assembly` see-thru mode now uses 50% transparency for orange boards and tan legs while keeping blue rails opaque
 - Bench and shelving assembly rendering order was refined to improve front/back leg, rail, and board overlap
 - Shelving assembly rendering is now grouped by shelf level so rails and boards layer together per tier
+- `Assembly` now uses an in-canvas control card for dimensions, show/hide toggles, and explode control
+- `Assembly` replaced the separate exploded view and now owns explode controls directly
+- Gallery shelf examples now default to `P-frame`
 - Gallery assets were relinked and resized to lighter `.jpg` files for faster loading
 
 ### Fixed
@@ -35,3 +39,5 @@ All notable changes to this project will be documented in this file.
 - Multiple orthographic view geometry, overlap, and annotation issues across Bench and Shelving modes
 - Shelving assembly now restores missing vertical legs and applies shelving-only special rules consistently:
   front legs extend `1.5"` above the top shelf in assembly view and front legs render above the top shelf board
+- `P-frame` rear-leg cutoff now aligns with the lower rail zone instead of over-trimming the rear leg
+- Preview warning copy now reflects build constraints rather than collisions

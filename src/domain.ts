@@ -278,7 +278,7 @@ export function deriveDesign(inputs: AppInputs): DerivedDesign {
       : normalizedInputs.height;
   const rearLegLength =
     normalizedInputs.furnitureType === "shelving" && normalizedInputs.frameMode === "p-frame"
-      ? Math.max(0, normalizedInputs.height - (normalizedInputs.bottomRailClearance + 2 * BOARD_THICKNESS))
+      ? Math.max(0, normalizedInputs.height - normalizedInputs.bottomRailClearance)
       : legVerticalLength;
 
   if (normalizedInputs.furnitureType === "shelving") {

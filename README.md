@@ -17,6 +17,7 @@ The current landing view opens on the gallery first, where example builds can be
 - Lets gallery photos open in a larger preview
 - Loads gallery presets directly into the planner
 - Generates `top / side / front / assembly` previews
+- Uses a unified in-canvas preview layout across all views
 - Calculates a cut list from fixed 2x4 rules
 - Optimizes cuts against `8 ft` stock boards
 - Estimates screws from rail-to-leg joints
@@ -32,13 +33,14 @@ The current landing view opens on the gallery first, where example builds can be
 - Planner default `Max Span` is `48"` with a minimum of `6"` and `6"` stepping
 - The planner opens to `Assembly` view by default
 - Loading any gallery build also opens the planner in `Assembly` view using `solid` fill mode
+- Gallery shelf examples default to `P-frame`
 
 ## Shelving Modes
 
 Shelving supports two frame modes:
 
 - `H-frame`: front and rear legs both run full height
-- `P-frame`: rear legs are cut off below the lowest shelf board, while front legs remain full height
+- `P-frame`: rear legs are cut off below the lowest rail zone, while front legs remain full height
 
 ## Shelving Assembly View Rules
 
@@ -48,6 +50,23 @@ The shelving assembly preview intentionally differs from the bench assembly prev
 - Front legs render above the top shelf board, so the front posts remain visually dominant in the stacked shelf view
 
 Bench assembly keeps the opposite behavior: top boards remain above the front legs and the legs are not extended.
+
+## Assembly Preview Controls
+
+The `Assembly` preview includes an in-canvas control card on the right side:
+
+- `Dimensions`: `Depth / Height / Length`
+- `Show / Hide`: toggle `Boards`, `Legs`, and `Rails`
+- `Explode Amount`: controls the assembly separation amount
+
+The fill toggle label in preview is:
+
+- `solid`
+- `see-thru`
+
+In `see-thru` mode for `Assembly`, orange boards and tan leg/support members use `50%` opacity while blue rails remain opaque.
+
+Build issues in preview are shown as an in-canvas `Build Constraint Warning`.
 
 ## Pricing Defaults
 
