@@ -120,7 +120,7 @@ function IconToggle<T extends string>({
 
 const DEFAULT_BOARD_UNIT_PRICE = 4.15;
 const DEFAULT_SCREW_UNIT_PRICE = 0.06;
-const LOCALE_STORAGE_KEY = "bench2x4-locale";
+const LOCALE_STORAGE_KEY = "justuse2x4-locale";
 
 const UI_STRINGS = {
   en: {
@@ -232,7 +232,7 @@ const UI_STRINGS = {
     floorZero: 'FLOOR 0"',
   },
   "zh-TW": {
-    appTitle: "2x4 組裝規劃工具",
+    appTitle: "2x4 家具規劃工具",
     pagePlanner: "規劃器",
     pageGallery: "案例集",
     languageEnglish: "EN",
@@ -259,7 +259,7 @@ const UI_STRINGS = {
     actualClearSpan: "實際淨跨距",
     bottomRailClearance: "底部橫檔離地",
     preview: "預覽",
-    previewNote: "以正投影 SVG 檢查結構配置。",
+    previewNote: "預覽結構配置，可用分解程度來看拆解結構。",
     solid: "實心",
     seeThru: "透視",
     top: "上視",
@@ -286,8 +286,8 @@ const UI_STRINGS = {
     cutList: "裁切清單",
     type: "類型",
     lengthColumn: "長度",
-    boardOptimization: "板材配置",
-    boardOptimizationLegend: "板材配置圖例",
+    boardOptimization: "板材裁切",
+    boardOptimizationLegend: "板材裁切圖例",
     verticalLegs: "立柱",
     rails: "橫檔",
     waste: "餘料",
@@ -706,7 +706,7 @@ function App() {
     <div className="app-shell">
       <header className="app-header">
         <div>
-          <p className="eyebrow">Bench2x4</p>
+          <p className="eyebrow">justuse2x4</p>
           <h1>{t.appTitle}</h1>
         </div>
         <div className="app-header-actions">
@@ -759,6 +759,7 @@ function App() {
                     ]}
                     value={furnitureType}
                     onChange={handleFurnitureTypeChange}
+                    caption={locale === "en" ? "Furniture Type" : "家具選項"}
                   />
                   {!isTopSurface ? (
                     <div className="parameterization-submode">
@@ -1216,9 +1217,9 @@ function App() {
                       </div>
                       <p className="gallery-card-description">{buildDescription}</p>
                       <ul className="gallery-meta">
-                        <li>{`L ${formatInches(buildInputs.length)}`}</li>
-                        <li>{`D ${formatInches(buildInputs.depth)}`}</li>
-                        <li>{`H ${formatInches(buildInputs.height)}`}</li>
+                        <li>{`${locale === "zh-TW" ? "長" : "L"} ${formatInches(buildInputs.length)}`}</li>
+                        <li>{`${locale === "zh-TW" ? "深" : "D"} ${formatInches(buildInputs.depth)}`}</li>
+                        <li>{`${locale === "zh-TW" ? "高" : "H"} ${formatInches(buildInputs.height)}`}</li>
                         <li>{`${t.clearance} ${formatInches(buildInputs.bottomRailClearance)}`}</li>
                         {shelfLevelsLabel ? <li>{shelfLevelsLabel}</li> : null}
                         {frameModeLabel ? <li>{frameModeLabel}</li> : null}
