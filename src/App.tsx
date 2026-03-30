@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   BOARD_THICKNESS,
   BOARD_WIDTH,
+  deriveDesign,
+  deriveFrameLayout,
+  formatInches,
   SAW_KERF,
   STOCK_LENGTH,
   type AppInputs,
@@ -10,9 +13,6 @@ import {
   type ShelvingInputs,
   type TopSurfaceInputs,
   type ViewMode,
-  deriveDesign,
-  deriveFrameLayout,
-  formatInches,
 } from "./domain";
 import entryBenchImage from "./gallery_asset/entry_bench_L24_D14_H19.jpg";
 import longBenchImage from "./gallery_asset/long_bench_L60_D14_H17p5.jpg";
@@ -519,6 +519,26 @@ function App() {
   const colorTheme: ColorTheme = "sunset";
   const t = UI_STRINGS[locale];
   const galleryPromo = GALLERY_PROMO[locale];
+  const galleryPromoParagraphs =
+    locale === "en"
+      ? [
+          "I built this because I genuinely think the humble 2x4 is one of the most underrated furniture materials on the planet.",
+          "It is structural lumber. Houses trust it to hold up roofs. That does not automatically make every 2x4 project elegant, but it does mean the raw material starts with a kind of honest, overqualified strength that most store-bought flat-pack furniture can only cosplay.",
+          "It is also refreshingly low drama to work with. You are usually dealing with cross cuts, repeated lengths, and pieces you can carry without wrestling a giant sheet across your garage like it is a boss battle. No giant plywood panels. No melamine dust storm. No moment where you realize you cut directly into the floor because you forgot a sacrificial board underneath.",
+          "I also like that 2x4 furniture ages with a little dignity. If you screw into it, ding it, drag it, overload it, or let it pick up a few scars, it still feels like the same object. A drywall hole feels like a mistake. A beat-up 2x4 feels like field data.",
+          "And then there is the practical part: 2x4s are cheap, available almost everywhere, and easy to replace. If a design works, great. If a design needs revision, you are not emotionally trapped by a pile of expensive sheet goods and exotic hardware. You just cut another board and keep iterating.",
+          "There is also a materials philosophy here. A simple 2x4 build is basically wood plus screws. No laminated mystery layers. No plastic coating pretending to be wood grain. No glue-heavy panel products if you do not want them. Just a very understandable material system that is easy to inspect, easy to repair, and easy to explain.",
+          "So this project is my nerdy attempt to make that system easier to use. I wanted a planner that helps you think in the native language of 2x4 builds: outer dimensions, repeated frames, predictable spans, cut lengths, stock usage, and a shopping list you can trust before you even leave the house.",
+        ]
+      : [
+          "會做這個工具，是因為我覺得最不起眼的 2x4 木材，其實是全北美最被低估的家具材料之一。",
+          "它本來就是結構用木料，是拿來撐整棟房子的屋頂的。這不代表用 2x4 做的東西就一定很精緻好看，但至少你一開始用的材料，就已經自帶一種很誠實、甚至有點「規格過剩」的強度——這點是大部分市售的平板組裝家具怎麼模仿都模仿不來的。",
+          "而且用它來做簡易家具很「不麻煩」。大多時候你只需要做截面切、重複長度的裁切，而且每一塊木料你都可以輕鬆搬動，不用在車庫跟一整片4x8裡纏鬥、像在對付一隻完全不想配合你的巨大 NPC。沒有巨大夾板、沒有美耐板粉塵滿天飛，也不會發生那種「靠盃忘了墊底板結果直接鋸到地板」的崩潰瞬間。",
+          "我也很喜歡 2x4 做出來的家具，會隨著使用慢慢「長出個性」。你在上面鎖螺絲、撞到、拖來拖去、超載，甚至留下刮痕，它還是同一個東西。drywall 破一個洞會讓人覺得是強迫症不補不行，但沒有人會注意到滿是枝椏點的 2x4 又多了一個螺絲孔。",
+          "再來是很實際的部分：2x4 便宜、好買，而且很好替換。如果設計成功，當然很好；如果設計要改，也不會被一堆昂貴板材和特殊五金綁住，也不用拿游標卡尺量半天，才發現裡面混了公制跟英制螺絲。只要再切一根，然後繼續迭代。",
+          "最後是這套系統有我鍾愛的工程哲學：簡單。樸素的 2x4 家具，基本上就是木頭加螺絲。沒有神祕的夾層。沒有假裝成木紋的塑膠表皮。也不用依賴大量膠合板材。它是一套非常容易理解、容易檢查、容易修理的材料系統。沒有甲醛、零揮發，還能反覆拆裝、重複利用。",
+          "所以這個專案就是一個很工程宅的嘗試，想讓這套系統更好用一點。我想做的是一個會用 2x4 原生語言思考的規劃器：外部尺寸、重複框架、可預期的跨度、切料長度、原材使用量，還有一份在出門買料之前就能放心的採購清單。",
+        ];
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1130,8 +1150,9 @@ function App() {
             <section className="panel-section gallery-promo">
               <p className="gallery-promo-eyebrow">{galleryPromo.eyebrow}</p>
               <h2>{galleryPromo.title}</h2>
-              <p className="gallery-promo-body">{galleryPromo.body}</p>
-              <p className="gallery-promo-body">{galleryPromo.body2}</p>
+              {galleryPromoParagraphs.map((paragraph: string) => (
+                <p key={paragraph} className="gallery-promo-body">{paragraph}</p>
+              ))}
             </section>
 
             <section className="panel-section">
