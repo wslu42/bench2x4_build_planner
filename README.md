@@ -2,6 +2,8 @@
 
 A small React app for planning fixed 2x4 furniture builds.
 
+Released under the [MIT License](./LICENSE).
+
 It is designed around one constrained build system instead of freeform modeling: you enter outer dimensions, and the app derives board counts, frame layout, cut lengths, stock usage, shopping list cost, and orthographic previews.
 
 The current landing view opens on the gallery first, where example builds can be loaded directly into the planner.
@@ -137,3 +139,7 @@ This project is intentionally parameter-based. It does not aim to support:
 - freeform furniture design
 
 The value of the tool is consistency: one repeatable 2x4 system, fast iteration, and predictable material output.
+
+## License
+
+MIT. See [LICENSE](./LICENSE).

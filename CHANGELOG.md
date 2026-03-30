@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- MIT `LICENSE`
 - Gallery page with example build cards and real photos from `src/gallery_asset`
 - Bilingual gallery promo card above the example builds
 - Click-to-preview gallery lightbox with `Load This Build`
@@ -32,6 +33,7 @@ All notable changes to this project will be documented in this file.
 - `Assembly` replaced the separate exploded view and now owns explode controls directly
 - Gallery shelf examples now default to `P-frame`
 - Gallery assets were relinked and resized to lighter `.jpg` files for faster loading
+- App footer now shows copyright and MIT license text
 
 ### Fixed
 

@@ -1265,6 +1265,11 @@ function App() {
           </div>
         </div>
       ) : null}
+      <footer className="app-footer">
+        {locale === "en"
+          ? "© 2026 justuse2x4. Released under the MIT License."
+          : "© 2026 justuse2x4．採用 MIT License 授權。"}
+      </footer>
     </div>
   );
 }

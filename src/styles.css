@@ -32,6 +32,14 @@ select {
   padding: 32px;
 }
 
+.app-footer {
+  margin-top: 20px;
+  padding: 0 8px 8px;
+  color: #7f6044;
+  font-size: 0.84rem;
+  text-align: center;
+}
+
 .app-header {
   display: flex;
   justify-content: space-between;
