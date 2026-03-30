@@ -475,8 +475,8 @@ const GALLERY_PROMO = {
       "I wanted a planner that thinks the way 2x4 projects actually work: outside dimensions first, repeated frames, simple cuts, predictable spans, clear stock usage, and a shopping list you can believe before you leave for the hardware store.",
   },
   "zh-TW": {
-    eyebrow: "為什麼是 2x4",
-    title: "夠耐用、能維修，而且規劃起來意外地有趣。",
+    eyebrow: "為什麼用 2x4 做家具？",
+    title: "夠耐用、能維修，而且設計起來意外地有趣。",
     body:
       "這個工具是做給這樣的人：看到一根普通 2x4，不會只想到建材，而是想到一個可靠、直接、耐操的家具模組。房子都靠它撐屋頂了，拿來做長椅、層架，還有那些每天都要承重的東西，其實非常合理。",
     body2:
