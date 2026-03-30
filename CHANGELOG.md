@@ -18,7 +18,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Unified project naming to `Bench2x4`
+- Unified project naming to `justuse2x4`
 - Landing page now opens on `Gallery`
 - Bench and Shelving defaults refined for height, clearance, max span, gallery presets, and default view
 - Material output reorganized into Shopping List, Cut List, Board Optimization, and Waste Summary

@@ -104,14 +104,8 @@ function IconToggle<T extends string>({
               <span />
               <span />
             </span>
+            <span className="icon-toggle-button-label">{option.label}</span>
           </button>
-        ))}
-      </div>
-      <div className="icon-toggle-labels" aria-hidden="true">
-        {options.map((option) => (
-          <span key={option.value} className={value === option.value ? "active" : ""}>
-            {option.label}
-          </span>
         ))}
       </div>
     </div>
@@ -248,8 +242,8 @@ const UI_STRINGS = {
     bench: "長凳",
     shelving: "層架",
     frameMode: "框架模式",
-    hFrame: "H 型框",
-    pFrame: "P 型框",
+    hFrame: "H 型",
+    pFrame: "P 型",
     derivedSummary: "推導摘要",
     frameCount: "框架數量",
     extraHFrames: "額外 H 型支撐",

@@ -1,4 +1,4 @@
-# Bench2x4
+# justuse2x4
 
 A small React app for planning fixed 2x4 furniture builds.
 
