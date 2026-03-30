@@ -1,17 +1,20 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   BOARD_THICKNESS,
   BOARD_WIDTH,
   deriveDesign,
-  deriveFrameLayout,
   formatInches,
   SAW_KERF,
   STOCK_LENGTH,
   type AppInputs,
+  type BenchInputs,
+  type DerivedDesign,
+  type FixedShelfInputs,
   type FrameMode,
   type FurnitureType,
-  type ShelvingInputs,
-  type TopSurfaceInputs,
+  type HybridShelfInputs,
+  type ShelfMode,
+  type AdjustableShelfInputs,
   type ViewMode,
 } from "./domain";
 import entryBenchImage from "./gallery_asset/entry_bench_L24_D14_H19.jpg";
@@ -23,7 +26,11 @@ type FillMode = "solid" | "pattern";
 type ColorTheme = "rainbow" | "pinkblue" | "neon" | "sunset" | "violet";
 type PageMode = "planner" | "gallery";
 type Locale = "en" | "zh-TW";
-type GalleryBuildInputs = Omit<TopSurfaceInputs, "maxSpan"> | Omit<ShelvingInputs, "maxSpan">;
+type GalleryBuildInputs =
+  | Omit<BenchInputs, "maxSpan">
+  | Omit<FixedShelfInputs, "maxSpan">
+  | Omit<AdjustableShelfInputs, "maxSpan">
+  | Omit<HybridShelfInputs, "maxSpan">;
 type LocalizedText = Record<Locale, string>;
 
 type GalleryBuild = {
@@ -47,11 +54,15 @@ type AssemblyVisibility = {
   rails: boolean;
 };
 
+type HybridSectionId = "left" | "right";
+
 type FieldProps = {
   label: string;
   value: number;
   min: number;
+  max?: number;
   step?: number;
+  hint?: string;
   onChange: (nextValue: number) => void;
 };
 
@@ -63,17 +74,19 @@ type IconToggleProps<T extends string> = {
   caption?: string;
 };
 
-function NumberField({ label, value, min, step = 0.5, onChange }: FieldProps) {
+function NumberField({ label, value, min, max, step = 0.5, hint, onChange }: FieldProps) {
   return (
     <label className="field">
       <span>{label}</span>
       <input
         type="number"
         min={min}
+        max={max}
         step={step}
         value={Number.isFinite(value) ? value : ""}
         onChange={(event) => onChange(Number(event.target.value))}
       />
+      {hint ? <small className="field-hint">{hint}</small> : null}
     </label>
   );
 }
@@ -129,7 +142,7 @@ const UI_STRINGS = {
     depthIn: "Depth (in)",
     heightIn: "Height (in)",
     maxSpanIn: "Max Open Span (in)",
-    bottomRailClearanceIn: "Bottom Rail Height (in)",
+    bottomRailClearanceIn: "Bottom Shelf clearance (in)",
     shelfLevels: "Shelf Levels",
     bench: "Bench",
     shelving: "Shelf",
@@ -143,7 +156,7 @@ const UI_STRINGS = {
     legLength: "Leg cut length",
     railLength: "Rail cut length",
     actualClearSpan: "Actual open span",
-    bottomRailClearance: "Bottom rail height",
+    bottomRailClearance: "Bottom Shelf clearance",
     preview: "Preview",
     previewNote: "Simple SVG views to check the structure.",
     solid: "solid",
@@ -199,7 +212,7 @@ const UI_STRINGS = {
     stockBoardLength: 'Stock board length: {length}"',
     sawKerf: 'Saw cut width: {kerf}"',
     maxSpanBadge: "Max open span: {value}",
-    bottomRailClearanceBadge: "Bottom rail height: {value}",
+    bottomRailClearanceBadge: "Bottom Shelf clearance: {value}",
     topBoardCount: "Top boards: {count}",
     shelfBoardCountPerLevel: "Shelf board count per level: {count}",
     frameModeBadge: "Frame style: {mode}",
@@ -237,7 +250,7 @@ const UI_STRINGS = {
     depthIn: "深度（英吋）",
     heightIn: "高度（英吋）",
     maxSpanIn: "最大跨距（英吋）",
-    bottomRailClearanceIn: "底部橫檔離地（英吋）",
+    bottomRailClearanceIn: "底層淨空（英吋）",
     shelfLevels: "層數",
     bench: "長凳",
     shelving: "層架",
@@ -251,7 +264,7 @@ const UI_STRINGS = {
     legLength: "立柱長度",
     railLength: "橫檔長度",
     actualClearSpan: "實際淨跨距",
-    bottomRailClearance: "底部橫檔離地",
+    bottomRailClearance: "底層淨空",
     preview: "預覽",
     previewNote: "預覽結構配置，可用分解程度來看拆解結構。",
     solid: "實心",
@@ -307,7 +320,7 @@ const UI_STRINGS = {
     stockBoardLength: '原材板長：{length}"',
     sawKerf: '鋸縫：{kerf}"',
     maxSpanBadge: "最大跨距：{value}",
-    bottomRailClearanceBadge: "底部橫檔離地：{value}",
+    bottomRailClearanceBadge: "底層淨空：{value}",
     topBoardCount: "頂板數量：{count}",
     shelfBoardCountPerLevel: "每層層板數量：{count}",
     frameModeBadge: "框架模式：{mode}",
@@ -359,7 +372,7 @@ function getLocalizedPartLabel(
   locale: Locale,
   partKey: string,
   frameMode?: FrameMode,
-  isTopSurface?: boolean,
+  isBench?: boolean,
 ) {
   const t = UI_STRINGS[locale];
   switch (partKey) {
@@ -368,7 +381,7 @@ function getLocalizedPartLabel(
     case "shelf-board":
       return t.shelfBoards;
     case "vertical-leg":
-      return !isTopSurface && frameMode === "p-frame" ? t.frontLegs : t.verticalLegs;
+      return !isBench && frameMode === "p-frame" ? t.frontLegs : t.verticalLegs;
     case "rear-leg":
       return t.rearLegs;
     case "side-rail":
@@ -378,6 +391,272 @@ function getLocalizedPartLabel(
   }
 }
 
+function getDefaultShelfOpenings(shelfCount: number) {
+  return Array.from({ length: Math.max(0, shelfCount - 1) }, () => 12);
+}
+
+function getDefaultHybridSections() {
+  return {
+    leftLength: 36,
+    rightLength: 24,
+    leftOpenings: [14, 14],
+    rightOpenings: [18],
+  };
+}
+
+function clampToRange(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.min(Math.max(value, min), max);
+}
+
+function snapToHalfInch(value: number) {
+  return Math.round(value * 2) / 2;
+}
+
+function snapToInch(value: number) {
+  return Math.round(value);
+}
+
+function getAdjustableOpeningMax(height: number, openingCount: number, otherOpeningsTotal: number) {
+  const maxTotalOpenings = Math.max(BOARD_THICKNESS, height - (openingCount + 1) * 2 * BOARD_THICKNESS);
+  return Math.max(BOARD_THICKNESS, maxTotalOpenings - otherOpeningsTotal);
+}
+
+function getOpeningMaxHint(locale: Locale, max: number) {
+  return locale === "en" ? `Max ${formatInches(max)}` : `上限 ${formatInches(max)}`;
+}
+
+function deriveOpeningLevelBottoms(height: number, clearOpenings: number[]) {
+  const highestRailBottom = Math.max(0, height - 2 * BOARD_THICKNESS);
+  const levelBottoms = [highestRailBottom];
+
+  for (let index = clearOpenings.length - 1; index >= 0; index -= 1) {
+    const previous = levelBottoms[0];
+    const nextBottom = previous - (2 * BOARD_THICKNESS + clearOpenings[index]);
+    levelBottoms.unshift(nextBottom);
+  }
+
+  return levelBottoms;
+}
+
+function hasSharedFrameConflict(leftOpenings: number[], rightOpenings: number[], height: number) {
+  const safeDistance = 2 * BOARD_THICKNESS;
+  const leftLevels = deriveOpeningLevelBottoms(height, leftOpenings).filter((bottom) => bottom >= 0);
+  const rightLevels = deriveOpeningLevelBottoms(height, rightOpenings).filter((bottom) => bottom >= 0);
+
+  for (const leftBottom of leftLevels) {
+    for (const rightBottom of rightLevels) {
+      const delta = Math.abs(leftBottom - rightBottom);
+
+      if (delta > 0.001 && delta < safeDistance) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function getHybridOpeningMax(
+  height: number,
+  sectionOpenings: number[],
+  openingIndex: number,
+  opposingOpenings: number[],
+  step = 0.5,
+) {
+  const overflowMax = getAdjustableOpeningMax(
+    height,
+    sectionOpenings.length,
+    sectionOpenings.reduce(
+      (sum, opening, index) => (index === openingIndex ? sum : sum + opening),
+      0,
+    ),
+  );
+
+  const nextOpenings = [...sectionOpenings];
+
+  for (let candidate = overflowMax; candidate >= BOARD_THICKNESS; candidate -= step) {
+    nextOpenings[openingIndex] = Number(candidate.toFixed(3));
+    if (!hasSharedFrameConflict(nextOpenings, opposingOpenings, height)) {
+      return Number(candidate.toFixed(3));
+    }
+  }
+
+  return BOARD_THICKNESS;
+}
+
+function sanitizeAdjustableOpenings(height: number, openings: number[]) {
+  const nextOpenings = [...openings];
+
+  for (let index = nextOpenings.length - 1; index >= 0; index -= 1) {
+    const openingMax = getAdjustableOpeningMax(
+      height,
+      nextOpenings.length,
+      nextOpenings.reduce(
+        (sum, opening, openingIndex) => (openingIndex === index ? sum : sum + opening),
+        0,
+      ),
+    );
+    nextOpenings[index] = clampToRange(nextOpenings[index], BOARD_THICKNESS, openingMax);
+  }
+
+  return nextOpenings;
+}
+
+function sanitizeHybridSectionOpenings(
+  height: number,
+  sectionOpenings: number[],
+  opposingOpenings: number[],
+  mode: "overflow-only" | "shared-frame",
+) {
+  const nextOpenings = [...sectionOpenings];
+
+  for (let index = nextOpenings.length - 1; index >= 0; index -= 1) {
+    const openingMax =
+      mode === "shared-frame"
+        ? getHybridOpeningMax(height, nextOpenings, index, opposingOpenings)
+        : getAdjustableOpeningMax(
+            height,
+            nextOpenings.length,
+            nextOpenings.reduce(
+              (sum, opening, openingIndex) => (openingIndex === index ? sum : sum + opening),
+              0,
+            ),
+          );
+    nextOpenings[index] = clampToRange(nextOpenings[index], BOARD_THICKNESS, openingMax);
+  }
+
+  return nextOpenings;
+}
+
+function sanitizeHybridOpenings(height: number, leftOpenings: number[], rightOpenings: number[]) {
+  const boundedLeft = sanitizeHybridSectionOpenings(
+    height,
+    leftOpenings,
+    rightOpenings,
+    "overflow-only",
+  );
+  const boundedRight = sanitizeHybridSectionOpenings(
+    height,
+    rightOpenings,
+    boundedLeft,
+    "shared-frame",
+  );
+
+  return {
+    left: boundedLeft,
+    right: boundedRight,
+  };
+}
+
+function getShelfModeLabel(locale: Locale, shelfMode: ShelfMode) {
+  const labels: Record<Locale, Record<ShelfMode, string>> = {
+    en: {
+      fixed: "Fixed Shelf",
+      adjustable: "Adjustable Shelf",
+      hybrid: "Hybrid Shelf",
+    },
+    "zh-TW": {
+      fixed: "固定層架",
+      adjustable: "可調層架",
+      hybrid: "混合層架",
+    },
+  };
+
+  return labels[locale][shelfMode];
+}
+
+function getLocalizedShelfControlLabel(
+  locale: Locale,
+  key:
+    | "shelfType"
+    | "opening"
+    | "shelfCount"
+    | "addOpening"
+    | "removeOpening"
+    | "hybridScaffold"
+    | "leftSection"
+    | "rightSection"
+    | "openingLength"
+    | "sharedTopLevel",
+) {
+  const labels: Record<Locale, Record<string, string>> = {
+    en: {
+      shelfType: "Shelf Type",
+      opening: "Opening",
+      shelfCount: "Shelf count",
+      addOpening: "Add opening",
+      removeOpening: "Remove opening",
+      hybridScaffold:
+        "Hybrid shelf is scaffolded in this release and will follow after fixed and adjustable shelf stabilization.",
+      leftSection: "Left section",
+      rightSection: "Right section",
+      openingLength: "Opening length",
+      sharedTopLevel: "Top shelf is shared across both sections in this version.",
+    },
+    "zh-TW": {
+      shelfType: "層架類型",
+      opening: "層間淨空",
+      shelfCount: "層板數",
+      addOpening: "新增淨空",
+      removeOpening: "移除最後一層淨空",
+      hybridScaffold: "Hybrid Shelf 這一版先保留資料與介面骨架，等 Fixed / Adjustable 穩定後再完整開放。",
+      leftSection: "左側區段",
+      rightSection: "右側區段",
+      sectionLength: "區段長度",
+      sharedTopLevel: "這一版固定共用最上層層板。",
+    },
+  };
+
+  return labels[locale][key] ?? labels[locale].sectionLength ?? labels.en[key];
+}
+
+function getPlannerGroupLabel(
+  locale: Locale,
+  key:
+    | "overallSize"
+    | "fixedShelfSetup"
+    | "adjustableOpenings"
+    | "sectionLengths"
+    | "leftSectionOpenings"
+    | "rightSectionOpenings",
+) {
+  const labels: Record<
+    Locale,
+    Record<
+      | "overallSize"
+      | "fixedShelfSetup"
+      | "adjustableOpenings"
+      | "sectionLengths"
+      | "leftSectionOpenings"
+      | "rightSectionOpenings",
+      string
+    >
+  > = {
+    en: {
+      overallSize: "Overall Size",
+      fixedShelfSetup: "Fixed Shelf Setup",
+      adjustableOpenings: "Shelf Openings",
+      sectionLengths: "Section Lengths",
+      leftSectionOpenings: "Left Section Openings",
+      rightSectionOpenings: "Right Section Openings",
+    },
+    "zh-TW": {
+      overallSize: "整體尺寸",
+      fixedShelfSetup: "固定層架設定",
+      adjustableOpenings: "層間淨空",
+      sectionLengths: "區段長度",
+      leftSectionOpenings: "左側區段淨空",
+      rightSectionOpenings: "右側區段淨空",
+    },
+  };
+
+  return labels[locale][key];
+}
+
 const GALLERY_BUILDS: GalleryBuild[] = [
   {
     id: "entry-bench",
@@ -385,14 +664,14 @@ const GALLERY_BUILDS: GalleryBuild[] = [
       en: "Entry Bench",
       "zh-TW": "玄關長凳",
     },
-    category: "top-surface",
+    category: "bench",
     description: {
       en: "Compact hallway bench with a simple open base and generous clearance.",
       "zh-TW": "適合玄關與走道的緊湊長凳，底部開放、離地空間充足。",
     },
     imageSrc: entryBenchImage,
     inputs: {
-      furnitureType: "top-surface",
+      furnitureType: "bench",
       length: 24,
       depth: 14,
       height: 19,
@@ -405,14 +684,14 @@ const GALLERY_BUILDS: GalleryBuild[] = [
       en: "Long Bench",
       "zh-TW": "長版長凳",
     },
-    category: "top-surface",
+    category: "bench",
     description: {
       en: "Longer seating span with one extra support frame to reduce flex.",
       "zh-TW": "較長的坐面配置，加入一組額外支撐框以降低撓曲。",
     },
     imageSrc: longBenchImage,
     inputs: {
-      furnitureType: "top-surface",
+      furnitureType: "bench",
       length: 60,
       depth: 14,
       height: 17.5,
@@ -425,19 +704,20 @@ const GALLERY_BUILDS: GalleryBuild[] = [
       en: "Two-Tier Shelf",
       "zh-TW": "雙層層架",
     },
-    category: "shelving",
+    category: "shelf",
     description: {
       en: "Open shelving preset for entry or workshop storage with comfortable lower clearance.",
       "zh-TW": "適合玄關或工作間的開放式層架，底部保留較大的使用淨空。",
     },
     imageSrc: twoTierShelfImage,
     inputs: {
-      furnitureType: "shelving",
+      furnitureType: "shelf",
+      shelfMode: "fixed",
       length: 51,
       depth: 17.5,
       height: 92,
       bottomRailClearance: 42.5,
-      shelfLevelCount: 2,
+      shelfCount: 2,
       frameMode: "p-frame",
     },
   },
@@ -447,20 +727,70 @@ const GALLERY_BUILDS: GalleryBuild[] = [
       en: "Three-Tier Shelf",
       "zh-TW": "三層層架",
     },
-    category: "shelving",
+    category: "shelf",
     description: {
       en: "Denser storage layout that still respects the fixed 2x4 frame system.",
       "zh-TW": "更高密度的收納配置，同時維持固定 2x4 結構系統。",
     },
     imageSrc: threeTierShelfImage,
     inputs: {
-      furnitureType: "shelving",
+      furnitureType: "shelf",
+      shelfMode: "fixed",
       length: 33,
       depth: 17.5,
       height: 92,
       bottomRailClearance: 13,
-      shelfLevelCount: 3,
+      shelfCount: 3,
       frameMode: "p-frame",
+    },
+  },
+  {
+    id: "adjustable-shelf",
+    title: {
+      en: "Adjustable Shelf",
+      "zh-TW": "可調層架",
+    },
+    category: "shelf",
+    description: {
+      en: "Shelf openings are defined explicitly while the overall height stays fixed at the top shelf.",
+      "zh-TW": "用明確層間淨空定義層架，最上層仍貼齊整體高度。",
+    },
+    imageSrc: threeTierShelfImage,
+    inputs: {
+      furnitureType: "shelf",
+      shelfMode: "adjustable",
+      length: 48,
+      depth: 17.5,
+      height: 72,
+      bottomRailClearance: 16.5,
+      clearOpenings: [14, 18],
+      frameMode: "h-frame",
+    },
+  },
+  {
+    id: "hybrid-shelf",
+    title: {
+      en: "Hybrid Shelf",
+      "zh-TW": "混合層架",
+    },
+    category: "shelf",
+    description: {
+      en: "Two side-by-side shelf sections share a center frame while keeping different opening patterns.",
+      "zh-TW": "左右兩段層架共用中間 frame，但仍可各自保有不同層間配置。",
+    },
+    imageSrc: twoTierShelfImage,
+    inputs: {
+      furnitureType: "shelf",
+      shelfMode: "hybrid",
+      length: 56.5,
+      depth: 17.5,
+      height: 72,
+      bottomRailClearance: 16.5,
+      frameMode: "p-frame",
+      sections: [
+        { sectionLength: 36, clearOpenings: [14, 14] },
+        { sectionLength: 24, clearOpenings: [18] },
+      ],
     },
   },
 ];
@@ -493,7 +823,7 @@ function App() {
     return saved === "en" || saved === "zh-TW" ? saved : "zh-TW";
   });
   const [pageMode, setPageMode] = useState<PageMode>("gallery");
-  const [furnitureType, setFurnitureType] = useState<FurnitureType>("top-surface");
+  const [furnitureType, setFurnitureType] = useState<FurnitureType>("bench");
   const [viewMode, setViewMode] = useState<ViewMode>("assembly");
   const [explodedAmount, setExplodedAmount] = useState(0);
   const [assemblyVisibility, setAssemblyVisibility] = useState<AssemblyVisibility>({
@@ -506,7 +836,13 @@ function App() {
   const [height, setHeight] = useState(17.5);
   const [maxSpan, setMaxSpan] = useState(48);
   const [bottomRailClearance, setBottomRailClearance] = useState(6);
-  const [shelfLevelCount, setShelfLevelCount] = useState(3);
+  const [shelfMode, setShelfMode] = useState<ShelfMode>("fixed");
+  const [shelfCount, setShelfCount] = useState(3);
+  const [shelfOpenings, setShelfOpenings] = useState<number[]>(getDefaultShelfOpenings(3));
+  const [hybridLeftLength, setHybridLeftLength] = useState(getDefaultHybridSections().leftLength);
+  const [hybridRightLength, setHybridRightLength] = useState(getDefaultHybridSections().rightLength);
+  const [hybridLeftOpenings, setHybridLeftOpenings] = useState<number[]>(getDefaultHybridSections().leftOpenings);
+  const [hybridRightOpenings, setHybridRightOpenings] = useState<number[]>(getDefaultHybridSections().rightOpenings);
   const [frameMode, setFrameMode] = useState<FrameMode>("h-frame");
   const [fillMode, setFillMode] = useState<FillMode>("solid");
   const [galleryPreview, setGalleryPreview] = useState<GalleryPreview | null>(null);
@@ -560,10 +896,18 @@ function App() {
   const handleFurnitureTypeChange = (nextType: FurnitureType) => {
     setFurnitureType(nextType);
 
-    if (nextType === "top-surface") {
+    if (nextType === "bench") {
       setHeight(17.5);
       setMaxSpan(48);
       setBottomRailClearance(6);
+      setShelfMode("fixed");
+      setShelfCount(3);
+      setShelfOpenings(getDefaultShelfOpenings(3));
+      const hybridDefaults = getDefaultHybridSections();
+      setHybridLeftLength(hybridDefaults.leftLength);
+      setHybridRightLength(hybridDefaults.rightLength);
+      setHybridLeftOpenings(hybridDefaults.leftOpenings);
+      setHybridRightOpenings(hybridDefaults.rightOpenings);
       setFrameMode("h-frame");
       return;
     }
@@ -571,7 +915,159 @@ function App() {
     setHeight(44);
     setMaxSpan(48);
     setBottomRailClearance(6);
+    setShelfMode("fixed");
+    setShelfCount(3);
+    setShelfOpenings(getDefaultShelfOpenings(3));
+    const hybridDefaults = getDefaultHybridSections();
+    setHybridLeftLength(hybridDefaults.leftLength);
+    setHybridRightLength(hybridDefaults.rightLength);
+    setHybridLeftOpenings(hybridDefaults.leftOpenings);
+    setHybridRightOpenings(hybridDefaults.rightOpenings);
     setFrameMode("h-frame");
+  };
+
+  const handleShelfModeChange = (nextMode: ShelfMode) => {
+    setShelfMode(nextMode);
+
+    if (nextMode === "fixed") {
+      setShelfCount(3);
+      setShelfOpenings(getDefaultShelfOpenings(3));
+      return;
+    }
+
+    if (nextMode === "adjustable") {
+      setShelfOpenings((current) => (current.length > 0 ? current : getDefaultShelfOpenings(3)));
+      return;
+    }
+
+    if (nextMode === "hybrid") {
+      const hybridDefaults = getDefaultHybridSections();
+      setHybridLeftLength((current) => current || hybridDefaults.leftLength);
+      setHybridRightLength((current) => current || hybridDefaults.rightLength);
+      setHybridLeftOpenings((current) => (current.length > 0 ? current : hybridDefaults.leftOpenings));
+      setHybridRightOpenings((current) => (current.length > 0 ? current : hybridDefaults.rightOpenings));
+    }
+  };
+
+  const handleHeightChange = (nextValue: number) => {
+    const nextHeight = Math.max(3.5, nextValue);
+
+    if (furnitureType === "bench") {
+      setHeight(nextHeight);
+      return;
+    }
+
+    if (shelfMode === "adjustable") {
+      const boundedOpenings = sanitizeAdjustableOpenings(nextHeight, shelfOpenings);
+      setShelfOpenings(boundedOpenings);
+      setShelfCount(boundedOpenings.length + 1);
+      setHeight(nextHeight);
+      return;
+    }
+
+    if (shelfMode === "hybrid") {
+      const boundedHybridOpenings = sanitizeHybridOpenings(
+        nextHeight,
+        hybridLeftOpenings,
+        hybridRightOpenings,
+      );
+      setHybridLeftOpenings(boundedHybridOpenings.left);
+      setHybridRightOpenings(boundedHybridOpenings.right);
+      setHeight(nextHeight);
+      return;
+    }
+
+    setHeight(nextHeight);
+  };
+
+  const addShelfOpening = () => {
+    setShelfOpenings((current) => {
+      const nextMax = getAdjustableOpeningMax(
+        height,
+        current.length + 1,
+        current.reduce((sum, opening) => sum + opening, 0),
+      );
+
+      if (nextMax <= BOARD_THICKNESS + 0.001) {
+        return current;
+      }
+
+      return [...current, clampToRange(12, BOARD_THICKNESS, nextMax)];
+    });
+  };
+
+  const removeShelfOpening = () => {
+    setShelfOpenings((current) => (current.length > 1 ? current.slice(0, -1) : current));
+  };
+
+  const updateAdjustableOpening = (index: number, nextValue: number) => {
+    setShelfOpenings((current) => {
+      const nextOpenings = current.map((entry, entryIndex) =>
+        entryIndex === index ? nextValue : entry,
+      );
+      return sanitizeAdjustableOpenings(height, nextOpenings);
+    });
+  };
+
+  const updateHybridSectionOpenings = (section: HybridSectionId, nextOpenings: number[]) => {
+    if (section === "left") {
+      setHybridLeftOpenings(nextOpenings);
+      return;
+    }
+
+    setHybridRightOpenings(nextOpenings);
+  };
+
+  const addHybridOpening = (section: HybridSectionId) => {
+    const sectionOpenings = section === "left" ? hybridLeftOpenings : hybridRightOpenings;
+    const opposingOpenings = section === "left" ? hybridRightOpenings : hybridLeftOpenings;
+    const nextIndex = sectionOpenings.length;
+    const provisionalOpenings = [...sectionOpenings, 12];
+    const nextMax = getHybridOpeningMax(height, provisionalOpenings, nextIndex, opposingOpenings);
+
+    if (nextMax <= BOARD_THICKNESS + 0.001) {
+      return;
+    }
+
+    updateHybridSectionOpenings(
+      section,
+      [...sectionOpenings, clampToRange(12, BOARD_THICKNESS, nextMax)],
+    );
+  };
+
+  const removeHybridOpening = (section: HybridSectionId) => {
+    const openings = section === "left" ? hybridLeftOpenings : hybridRightOpenings;
+    updateHybridSectionOpenings(section, openings.length > 1 ? openings.slice(0, -1) : openings);
+  };
+
+  const updateHybridOpening = (section: HybridSectionId, index: number, nextValue: number) => {
+    const nextLeftOpenings =
+      section === "left"
+        ? hybridLeftOpenings.map((entry, entryIndex) => (entryIndex === index ? nextValue : entry))
+        : hybridLeftOpenings;
+    const nextRightOpenings =
+      section === "right"
+        ? hybridRightOpenings.map((entry, entryIndex) => (entryIndex === index ? nextValue : entry))
+        : hybridRightOpenings;
+    const boundedHybridOpenings = sanitizeHybridOpenings(height, nextLeftOpenings, nextRightOpenings);
+
+    setHybridLeftOpenings(boundedHybridOpenings.left);
+    setHybridRightOpenings(boundedHybridOpenings.right);
+  };
+
+  const updateHybridSectionLength = (section: HybridSectionId, nextOpeningLength: number) => {
+    const boundedLength = Math.max(BOARD_WIDTH * 2, snapToInch(nextOpeningLength + 2 * BOARD_THICKNESS));
+
+    if (section === "left") {
+      setHybridLeftLength(boundedLength);
+      return;
+    }
+
+    setHybridRightLength(boundedLength);
+  };
+
+  const updateShelfLength = (nextOpeningLength: number) => {
+    setLength(Math.max(BOARD_WIDTH * 2, snapToInch(nextOpeningLength + 2 * BOARD_THICKNESS)));
   };
 
   const applyBuildPreset = (presetInputs: GalleryBuildInputs) => {
@@ -581,17 +1077,39 @@ function App() {
     setHeight(presetInputs.height);
     setMaxSpan(48);
     setBottomRailClearance(presetInputs.bottomRailClearance);
-    setShelfLevelCount(
-      presetInputs.furnitureType === "shelving" ? presetInputs.shelfLevelCount : 3,
-    );
-    setFrameMode(presetInputs.furnitureType === "shelving" ? presetInputs.frameMode : "h-frame");
+    if (presetInputs.furnitureType === "shelf") {
+      setShelfMode(presetInputs.shelfMode);
+      setFrameMode(presetInputs.frameMode);
+      if (presetInputs.shelfMode === "fixed") {
+        setShelfCount(presetInputs.shelfCount);
+        setShelfOpenings(getDefaultShelfOpenings(presetInputs.shelfCount));
+      } else if (presetInputs.shelfMode === "adjustable") {
+        setShelfOpenings(presetInputs.clearOpenings);
+        setShelfCount(presetInputs.clearOpenings.length + 1);
+      } else {
+        setHybridLeftLength(presetInputs.sections[0].sectionLength);
+        setHybridRightLength(presetInputs.sections[1].sectionLength);
+        setHybridLeftOpenings(presetInputs.sections[0].clearOpenings);
+        setHybridRightOpenings(presetInputs.sections[1].clearOpenings);
+      }
+    } else {
+      setShelfMode("fixed");
+      setShelfCount(3);
+      setShelfOpenings(getDefaultShelfOpenings(3));
+      const hybridDefaults = getDefaultHybridSections();
+      setHybridLeftLength(hybridDefaults.leftLength);
+      setHybridRightLength(hybridDefaults.rightLength);
+      setHybridLeftOpenings(hybridDefaults.leftOpenings);
+      setHybridRightOpenings(hybridDefaults.rightOpenings);
+      setFrameMode("h-frame");
+    }
     setViewMode("assembly");
     setFillMode("solid");
     setPageMode("planner");
   };
 
   const inputs: AppInputs = useMemo(() => {
-    if (furnitureType === "top-surface") {
+    if (furnitureType === "bench") {
       return {
         furnitureType,
         length,
@@ -602,15 +1120,53 @@ function App() {
       };
     }
 
+    if (shelfMode === "fixed") {
+      return {
+        furnitureType,
+        shelfMode,
+        length,
+        depth,
+        height,
+        maxSpan,
+        bottomRailClearance,
+        shelfCount,
+        frameMode,
+      };
+    }
+
+    if (shelfMode === "adjustable") {
+      return {
+        furnitureType,
+        shelfMode,
+        length,
+        depth,
+        height,
+        maxSpan,
+        bottomRailClearance,
+        clearOpenings: shelfOpenings,
+        frameMode,
+      };
+    }
+
     return {
       furnitureType,
-      length,
+      shelfMode,
+      length: hybridLeftLength + hybridRightLength - BOARD_WIDTH,
       depth,
       height,
       maxSpan,
       bottomRailClearance,
-      shelfLevelCount,
       frameMode,
+      sections: [
+        {
+          sectionLength: hybridLeftLength,
+          clearOpenings: hybridLeftOpenings,
+        },
+        {
+          sectionLength: hybridRightLength,
+          clearOpenings: hybridRightOpenings,
+        },
+      ],
     };
   }, [
     bottomRailClearance,
@@ -620,12 +1176,67 @@ function App() {
     height,
     length,
     maxSpan,
-    shelfLevelCount,
+    shelfCount,
+    shelfMode,
+    shelfOpenings,
+    hybridLeftLength,
+    hybridRightLength,
+    hybridLeftOpenings,
+    hybridRightOpenings,
   ]);
 
   const design = useMemo(() => deriveDesign(inputs), [inputs]);
   const effectiveInputs = design.normalizedInputs;
-  const isTopSurface = effectiveInputs.furnitureType === "top-surface";
+  const isBench = effectiveInputs.furnitureType === "bench";
+  const effectiveFrameMode = effectiveInputs.furnitureType === "shelf" ? effectiveInputs.frameMode : undefined;
+  const adjustableOpeningMaxes = useMemo(
+    () =>
+      shelfOpenings.map((_, index) =>
+        getAdjustableOpeningMax(
+          height,
+          shelfOpenings.length,
+          shelfOpenings.reduce(
+            (sum, opening, openingIndex) => (openingIndex === index ? sum : sum + opening),
+            0,
+          ),
+        ),
+      ),
+    [height, shelfOpenings],
+  );
+  const nextAdjustableOpeningMax = useMemo(
+    () =>
+      getAdjustableOpeningMax(
+        height,
+        shelfOpenings.length + 1,
+        shelfOpenings.reduce((sum, opening) => sum + opening, 0),
+      ),
+    [height, shelfOpenings],
+  );
+  const canAddAdjustableOpening = nextAdjustableOpeningMax > BOARD_THICKNESS + 0.001;
+  const hybridLeftOpeningMaxes = useMemo(
+    () =>
+      hybridLeftOpenings.map((_, index) =>
+        getHybridOpeningMax(height, hybridLeftOpenings, index, hybridRightOpenings),
+      ),
+    [height, hybridLeftOpenings, hybridRightOpenings],
+  );
+  const hybridRightOpeningMaxes = useMemo(
+    () =>
+      hybridRightOpenings.map((_, index) =>
+        getHybridOpeningMax(height, hybridRightOpenings, index, hybridLeftOpenings),
+      ),
+    [height, hybridLeftOpenings, hybridRightOpenings],
+  );
+  const nextHybridLeftOpeningMax = useMemo(
+    () => getHybridOpeningMax(height, [...hybridLeftOpenings, 12], hybridLeftOpenings.length, hybridRightOpenings),
+    [height, hybridLeftOpenings, hybridRightOpenings],
+  );
+  const nextHybridRightOpeningMax = useMemo(
+    () => getHybridOpeningMax(height, [...hybridRightOpenings, 12], hybridRightOpenings.length, hybridLeftOpenings),
+    [height, hybridLeftOpenings, hybridRightOpenings],
+  );
+  const canAddHybridLeftOpening = nextHybridLeftOpeningMax > BOARD_THICKNESS + 0.001;
+  const canAddHybridRightOpening = nextHybridRightOpeningMax > BOARD_THICKNESS + 0.001;
   const boardUnitPrice = DEFAULT_BOARD_UNIT_PRICE;
   const screwUnitPrice = DEFAULT_SCREW_UNIT_PRICE;
   const boardLineTotal = design.stockPlan.length * boardUnitPrice;
@@ -647,12 +1258,12 @@ function App() {
     fillTemplate(t.bottomRailClearanceBadge, {
       value: formatInches(effectiveInputs.bottomRailClearance),
     }),
-    isTopSurface
+    isBench
       ? fillTemplate(t.topBoardCount, { count: design.boardCountPerLevel })
       : fillTemplate(t.shelfBoardCountPerLevel, { count: design.boardCountPerLevel }),
-    !isTopSurface
+    !isBench
       ? fillTemplate(t.frameModeBadge, {
-          mode: frameMode === "h-frame" ? t.hFrame : t.pFrame,
+          mode: effectiveFrameMode === "h-frame" ? t.hFrame : t.pFrame,
         })
       : null,
   ].filter((badge): badge is string => Boolean(badge));
@@ -678,10 +1289,43 @@ function App() {
       setBottomRailClearance(effectiveInputs.bottomRailClearance);
     }
 
-    if (!isTopSurface && shelfLevelCount !== effectiveInputs.shelfLevelCount) {
-      setShelfLevelCount(effectiveInputs.shelfLevelCount);
+    if (!isBench && effectiveInputs.shelfMode === "fixed" && shelfCount !== effectiveInputs.shelfCount) {
+      setShelfCount(effectiveInputs.shelfCount);
     }
-    if (!isTopSurface && frameMode !== effectiveInputs.frameMode) {
+    if (!isBench && effectiveInputs.shelfMode === "adjustable") {
+      const nextOpenings = effectiveInputs.clearOpenings;
+      if (
+        shelfOpenings.length !== nextOpenings.length ||
+        shelfOpenings.some((opening, index) => opening !== nextOpenings[index])
+      ) {
+        setShelfOpenings(nextOpenings);
+      }
+      if (shelfCount !== nextOpenings.length + 1) {
+        setShelfCount(nextOpenings.length + 1);
+      }
+    }
+    if (!isBench && effectiveInputs.shelfMode === "hybrid") {
+      const [leftSection, rightSection] = effectiveInputs.sections;
+      if (hybridLeftLength !== leftSection.sectionLength) {
+        setHybridLeftLength(leftSection.sectionLength);
+      }
+      if (hybridRightLength !== rightSection.sectionLength) {
+        setHybridRightLength(rightSection.sectionLength);
+      }
+      if (
+        hybridLeftOpenings.length !== leftSection.clearOpenings.length ||
+        hybridLeftOpenings.some((opening, index) => opening !== leftSection.clearOpenings[index])
+      ) {
+        setHybridLeftOpenings(leftSection.clearOpenings);
+      }
+      if (
+        hybridRightOpenings.length !== rightSection.clearOpenings.length ||
+        hybridRightOpenings.some((opening, index) => opening !== rightSection.clearOpenings[index])
+      ) {
+        setHybridRightOpenings(rightSection.clearOpenings);
+      }
+    }
+    if (!isBench && frameMode !== effectiveInputs.frameMode) {
       setFrameMode(effectiveInputs.frameMode);
     }
   }, [
@@ -690,10 +1334,15 @@ function App() {
     effectiveInputs,
     frameMode,
     height,
-    isTopSurface,
+    isBench,
     length,
     maxSpan,
-    shelfLevelCount,
+    shelfCount,
+    shelfOpenings,
+    hybridLeftLength,
+    hybridRightLength,
+    hybridLeftOpenings,
+    hybridRightOpenings,
   ]);
 
   return (
@@ -748,15 +1397,26 @@ function App() {
                   <IconToggle
                     ariaLabel={locale === "en" ? "Furniture Type" : "家具類型"}
                     options={[
-                      { value: "top-surface", label: t.bench },
-                      { value: "shelving", label: t.shelving },
+                      { value: "bench", label: t.bench },
+                      { value: "shelf", label: t.shelving },
                     ]}
                     value={furnitureType}
                     onChange={handleFurnitureTypeChange}
                     caption={locale === "en" ? "Furniture Type" : "家具選項"}
                   />
-                  {!isTopSurface ? (
+                  {!isBench ? (
                     <div className="parameterization-submode">
+                      <IconToggle
+                        ariaLabel={locale === "en" ? "Shelf Mode" : "Shelf Mode"}
+                        options={[
+                          { value: "fixed", label: getShelfModeLabel(locale, "fixed") },
+                          { value: "adjustable", label: getShelfModeLabel(locale, "adjustable") },
+                          { value: "hybrid", label: getShelfModeLabel(locale, "hybrid") },
+                        ]}
+                        value={shelfMode}
+                        onChange={handleShelfModeChange}
+                        caption={getLocalizedShelfControlLabel(locale, "shelfType")}
+                      />
                       <IconToggle
                         ariaLabel={locale === "en" ? "Frame Mode" : "框架模式"}
                         options={[
@@ -777,27 +1437,218 @@ function App() {
                 <div className="parameterization-card parameterization-input-card">
                   <h3>{t.parameterization}</h3>
                   <p className="muted">{t.parameterizationNote}</p>
-                  <section className="field-grid">
-                    <NumberField label={t.lengthIn} value={length} min={12} onChange={setLength} />
-                    <NumberField label={t.depthIn} value={depth} min={3.5} onChange={setDepth} />
-                    <NumberField label={t.heightIn} value={height} min={3.5} onChange={setHeight} />
-                    <NumberField label={t.maxSpanIn} value={maxSpan} min={6} step={6} onChange={setMaxSpan} />
-                    <NumberField
-                      label={t.bottomRailClearanceIn}
-                      value={bottomRailClearance}
-                      min={0}
-                      onChange={setBottomRailClearance}
-                    />
-                    {!isTopSurface ? (
-                      <NumberField
-                        label={t.shelfLevels}
-                        value={shelfLevelCount}
-                        min={1}
-                        step={1}
-                        onChange={setShelfLevelCount}
-                      />
-                    ) : null}
+                  <section className="planner-input-group">
+                    <div className="planner-input-group-header">
+                      <h4>{getPlannerGroupLabel(locale, "overallSize")}</h4>
+                    </div>
+                    <section className="field-grid">
+                      <NumberField label={t.lengthIn} value={length} min={12} onChange={setLength} />
+                      <NumberField label={t.depthIn} value={depth} min={3.5} onChange={setDepth} />
+                      <NumberField label={t.heightIn} value={height} min={3.5} onChange={handleHeightChange} />
+                      <NumberField label={t.maxSpanIn} value={maxSpan} min={6} step={6} onChange={setMaxSpan} />
+                    </section>
                   </section>
+                  {!isBench && shelfMode === "fixed" ? (
+                    <section className="planner-input-group">
+                      <div className="planner-input-group-header">
+                        <h4>{getPlannerGroupLabel(locale, "fixedShelfSetup")}</h4>
+                      </div>
+                      <section className="field-grid">
+                        <NumberField
+                          label={t.shelfLevels}
+                          value={shelfCount}
+                          min={1}
+                          step={1}
+                          onChange={(nextValue) => {
+                            const nextCount = Math.max(1, Math.round(nextValue));
+                            setShelfCount(nextCount);
+                            setShelfOpenings(getDefaultShelfOpenings(nextCount));
+                          }}
+                        />
+                      </section>
+                    </section>
+                  ) : null}
+                  {!isBench && shelfMode === "adjustable" ? (
+                    <section className="planner-input-group">
+                      <div className="planner-input-group-header">
+                        <h4>{getPlannerGroupLabel(locale, "adjustableOpenings")}</h4>
+                      </div>
+                      <section className="field-grid">
+                      {shelfOpenings.map((opening, index) => {
+                        const openingMax = adjustableOpeningMaxes[index] ?? BOARD_THICKNESS;
+
+                        return (
+                          <NumberField
+                            key={`opening-${index}`}
+                            label={`${getLocalizedShelfControlLabel(locale, "opening")} ${index + 1}`}
+                            value={opening}
+                            min={BOARD_THICKNESS}
+                            max={openingMax}
+                            hint={getOpeningMaxHint(locale, openingMax)}
+                            onChange={(nextValue) => {
+                              updateAdjustableOpening(
+                                index,
+                                clampToRange(nextValue, BOARD_THICKNESS, openingMax),
+                              );
+                            }}
+                          />
+                        );
+                      })}
+                      <label className="field">
+                        <span>{getLocalizedShelfControlLabel(locale, "shelfCount")}</span>
+                        <input type="text" value={shelfOpenings.length + 1} readOnly />
+                      </label>
+                      </section>
+                      <div className="planner-inline-actions">
+                      <button
+                        type="button"
+                        className="gallery-load-pill"
+                        onClick={addShelfOpening}
+                        disabled={!canAddAdjustableOpening}
+                        title={
+                          canAddAdjustableOpening
+                            ? getOpeningMaxHint(locale, nextAdjustableOpeningMax)
+                            : locale === "en"
+                              ? "Increase height or reduce existing openings to add another opening."
+                              : "請先增加高度或減少既有淨空，才能再新增一層淨空。"
+                        }
+                      >
+                        {getLocalizedShelfControlLabel(locale, "addOpening")}
+                      </button>
+                      <button
+                        type="button"
+                        className="gallery-load-pill"
+                        onClick={removeShelfOpening}
+                        disabled={shelfOpenings.length <= 1}
+                      >
+                        {getLocalizedShelfControlLabel(locale, "removeOpening")}
+                      </button>
+                      </div>
+                    </section>
+                  ) : null}
+                  {!isBench && shelfMode === "hybrid" ? (
+                    <>
+                      <section className="planner-input-group">
+                        <div className="planner-input-group-header">
+                          <h4>{getPlannerGroupLabel(locale, "sectionLengths")}</h4>
+                        </div>
+                      <section className="field-grid">
+                        <NumberField
+                          label={getLocalizedShelfControlLabel(locale, "openingLength") + ` (${getLocalizedShelfControlLabel(locale, "leftSection")})`}
+                          value={Math.max(BOARD_WIDTH, hybridLeftLength - 2 * BOARD_THICKNESS)}
+                          min={BOARD_WIDTH}
+                          step={1}
+                          onChange={(nextValue) => updateHybridSectionLength("left", nextValue)}
+                        />
+                        <NumberField
+                          label={getLocalizedShelfControlLabel(locale, "openingLength") + ` (${getLocalizedShelfControlLabel(locale, "rightSection")})`}
+                          value={Math.max(BOARD_WIDTH, hybridRightLength - 2 * BOARD_THICKNESS)}
+                          min={BOARD_WIDTH}
+                          step={1}
+                          onChange={(nextValue) => updateHybridSectionLength("right", nextValue)}
+                        />
+                      </section>
+                      </section>
+                      <section className="planner-input-group">
+                        <div className="planner-input-group-header">
+                          <h4>{getPlannerGroupLabel(locale, "adjustableOpenings")}</h4>
+                        </div>
+                      <section className="field-grid">
+                        {hybridLeftOpenings.map((opening, index) => {
+                          const openingMax = hybridLeftOpeningMaxes[index] ?? BOARD_THICKNESS;
+
+                          return (
+                            <NumberField
+                              key={`hybrid-left-opening-${index}`}
+                              label={`${getLocalizedShelfControlLabel(locale, "leftSection")} ${getLocalizedShelfControlLabel(locale, "opening")} ${index + 1}`}
+                              value={opening}
+                              min={BOARD_THICKNESS}
+                              max={openingMax}
+                              hint={getOpeningMaxHint(locale, openingMax)}
+                              onChange={(nextValue) => {
+                                updateHybridOpening(
+                                  "left",
+                                  index,
+                                  clampToRange(nextValue, BOARD_THICKNESS, openingMax),
+                                );
+                              }}
+                            />
+                          );
+                        })}
+                        {hybridRightOpenings.map((opening, index) => {
+                          const openingMax = hybridRightOpeningMaxes[index] ?? BOARD_THICKNESS;
+
+                          return (
+                            <NumberField
+                              key={`hybrid-right-opening-${index}`}
+                              label={`${getLocalizedShelfControlLabel(locale, "rightSection")} ${getLocalizedShelfControlLabel(locale, "opening")} ${index + 1}`}
+                              value={opening}
+                              min={BOARD_THICKNESS}
+                              max={openingMax}
+                              hint={getOpeningMaxHint(locale, openingMax)}
+                              onChange={(nextValue) => {
+                                updateHybridOpening(
+                                  "right",
+                                  index,
+                                  clampToRange(nextValue, BOARD_THICKNESS, openingMax),
+                                );
+                              }}
+                            />
+                          );
+                        })}
+                      </section>
+                      <div className="planner-inline-actions">
+                        <button
+                          type="button"
+                          className="gallery-load-pill"
+                          onClick={() => addHybridOpening("left")}
+                          disabled={!canAddHybridLeftOpening}
+                          title={
+                            canAddHybridLeftOpening
+                              ? getOpeningMaxHint(locale, nextHybridLeftOpeningMax)
+                              : locale === "en"
+                                ? "No more vertical room remains in the left section."
+                                : "左側區段已沒有可用的垂直空間。"
+                          }
+                        >
+                          {`${getLocalizedShelfControlLabel(locale, "addOpening")} (${getLocalizedShelfControlLabel(locale, "leftSection")})`}
+                        </button>
+                        <button
+                          type="button"
+                          className="gallery-load-pill"
+                          onClick={() => removeHybridOpening("left")}
+                          disabled={hybridLeftOpenings.length <= 1}
+                        >
+                          {`${getLocalizedShelfControlLabel(locale, "removeOpening")} (${getLocalizedShelfControlLabel(locale, "leftSection")})`}
+                        </button>
+                        <button
+                          type="button"
+                          className="gallery-load-pill"
+                          onClick={() => addHybridOpening("right")}
+                          disabled={!canAddHybridRightOpening}
+                          title={
+                            canAddHybridRightOpening
+                              ? getOpeningMaxHint(locale, nextHybridRightOpeningMax)
+                              : locale === "en"
+                                ? "No more vertical room remains in the right section."
+                                : "右側區段已沒有可用的垂直空間。"
+                          }
+                        >
+                          {`${getLocalizedShelfControlLabel(locale, "addOpening")} (${getLocalizedShelfControlLabel(locale, "rightSection")})`}
+                        </button>
+                        <button
+                          type="button"
+                          className="gallery-load-pill"
+                          onClick={() => removeHybridOpening("right")}
+                          disabled={hybridRightOpenings.length <= 1}
+                        >
+                          {`${getLocalizedShelfControlLabel(locale, "removeOpening")} (${getLocalizedShelfControlLabel(locale, "rightSection")})`}
+                        </button>
+                      </div>
+                      </section>
+                      <p className="muted">{getLocalizedShelfControlLabel(locale, "sharedTopLevel")}</p>
+                    </>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -873,7 +1724,7 @@ function App() {
           </div>
 
           <PreviewCanvas
-            inputs={effectiveInputs}
+            design={design}
             viewMode={viewMode}
             fillMode={fillMode}
             colorTheme={colorTheme}
@@ -883,6 +1734,10 @@ function App() {
             onExplodedAmountChange={setExplodedAmount}
             assemblyVisibility={assemblyVisibility}
             onAssemblyVisibilityChange={setAssemblyVisibility}
+            onAdjustableOpeningChange={updateAdjustableOpening}
+            onHybridOpeningChange={updateHybridOpening}
+            onShelfLengthChange={updateShelfLength}
+            onHybridSectionLengthChange={updateHybridSectionLength}
           />
 
           <section className="panel-section">
@@ -982,8 +1837,8 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {design.parts.map((part) => (
-                  <tr key={part.key}>
+                {design.parts.map((part, index) => (
+                  <tr key={part.id ?? `${part.key}-${index}`}>
                     <td>
                       <span className="table-type-item">
                         <span
@@ -1005,7 +1860,7 @@ function App() {
                             } as CSSProperties
                           }
                         />
-                        {getLocalizedPartLabel(locale, part.key, frameMode, isTopSurface)}
+                        {getLocalizedPartLabel(locale, part.key, effectiveFrameMode, isBench)}
                       </span>
                     </td>
                     <td>{formatInches(part.length)}</td>
@@ -1023,9 +1878,9 @@ function App() {
                 <span className="board-optimization-legend-item">
                   <span
                     className="board-optimization-legend-swatch"
-                    style={{ backgroundColor: stockSegmentStyles[isTopSurface ? "top-board" : "shelf-board"].fill }}
+                    style={{ backgroundColor: stockSegmentStyles[isBench ? "top-board" : "shelf-board"].fill }}
                   />
-                  {isTopSurface ? t.topBoards : t.shelfBoards}
+                  {isBench ? t.topBoards : t.shelfBoards}
                 </span>
                 <span className="board-optimization-legend-item">
                   <span
@@ -1074,7 +1929,7 @@ function App() {
                                 backgroundColor: segmentStyle.fill,
                                 borderColor: segmentStyle.stroke,
                               }}
-                              title={`${getLocalizedPartLabel(locale, cut.partKey, frameMode, isTopSurface)} ${formatInches(cut.length)}`}
+                              title={`${getLocalizedPartLabel(locale, cut.partKey, effectiveFrameMode, isBench)} ${formatInches(cut.length)}`}
                             >
                               {showSegmentLabel ? <span>{formatInches(cut.length)}</span> : null}
                             </div>
@@ -1161,16 +2016,26 @@ function App() {
               {GALLERY_BUILDS.map((build) => {
                 const buildInputs = build.inputs;
                 const shelfLevelsLabel =
-                  buildInputs.furnitureType === "shelving"
-                    ? `${t.levels} ${buildInputs.shelfLevelCount}`
+                  buildInputs.furnitureType === "shelf"
+                    ? `${t.levels} ${
+                        buildInputs.shelfMode === "fixed"
+                          ? buildInputs.shelfCount
+                          : buildInputs.shelfMode === "adjustable"
+                            ? buildInputs.clearOpenings.length + 1
+                            : `${buildInputs.sections[0].clearOpenings.length + 1} / ${buildInputs.sections[1].clearOpenings.length + 1}`
+                      }`
                     : null;
                 const frameModeLabel =
-                  buildInputs.furnitureType === "shelving"
+                  buildInputs.furnitureType === "shelf"
                     ? `${t.frame} ${buildInputs.frameMode === "h-frame" ? t.hFrame : t.pFrame}`
+                    : null;
+                const shelfModeLabel =
+                  buildInputs.furnitureType === "shelf"
+                    ? getShelfModeLabel(locale, buildInputs.shelfMode)
                     : null;
                 const buildTitle = build.title[locale];
                 const buildDescription = build.description[locale];
-                const categoryLabel = build.category === "top-surface" ? t.bench : t.shelving;
+                const categoryLabel = build.category === "bench" ? t.bench : t.shelving;
 
                 return (
                   <article key={build.id} className="gallery-card">
@@ -1195,7 +2060,7 @@ function App() {
                         <div className="gallery-card-actions">
                           <span
                             className={`gallery-chip ${
-                              build.category === "top-surface" ? "gallery-chip-bench" : "gallery-chip-shelving"
+                              build.category === "bench" ? "gallery-chip-bench" : "gallery-chip-shelving"
                             }`}
                           >
                             {categoryLabel}
@@ -1217,6 +2082,7 @@ function App() {
                         <li>{`${t.clearance} ${formatInches(buildInputs.bottomRailClearance)}`}</li>
                         {shelfLevelsLabel ? <li>{shelfLevelsLabel}</li> : null}
                         {frameModeLabel ? <li>{frameModeLabel}</li> : null}
+                        {shelfModeLabel ? <li>{shelfModeLabel}</li> : null}
                       </ul>
                     </div>
                   </article>
@@ -1275,7 +2141,7 @@ function App() {
 }
 
 type PreviewProps = {
-  inputs: AppInputs;
+  design: DerivedDesign;
   viewMode: ViewMode;
   fillMode: FillMode;
   colorTheme: ColorTheme;
@@ -1285,6 +2151,10 @@ type PreviewProps = {
   onExplodedAmountChange: (value: number) => void;
   assemblyVisibility: AssemblyVisibility;
   onAssemblyVisibilityChange: (value: AssemblyVisibility) => void;
+  onAdjustableOpeningChange: (index: number, nextValue: number) => void;
+  onHybridOpeningChange: (section: HybridSectionId, index: number, nextValue: number) => void;
+  onShelfLengthChange: (nextValue: number) => void;
+  onHybridSectionLengthChange: (section: HybridSectionId, nextValue: number) => void;
 };
 
 type DimensionLineProps = {
@@ -1296,6 +2166,41 @@ type DimensionLineProps = {
   textX?: number;
   textY?: number;
   textAnchor?: "start" | "middle" | "end";
+};
+
+type PrismEdgeMask = {
+  hideRightFace?: boolean;
+  hideTopLeftEdge?: boolean;
+  hideTopRightEdge?: boolean;
+  hideBackLeftEdge?: boolean;
+  hideBackRightEdge?: boolean;
+};
+
+type OpeningHandle = {
+  key: string;
+  sectionId: string;
+  section: HybridSectionId | "adjustable";
+  openingIndex: number;
+  x: number;
+  centerHeight: number;
+  openingHeight: number;
+  lowerTop: number;
+  upperBottom: number;
+};
+
+type SectionLengthHandle = {
+  key: string;
+  section: HybridSectionId | "single";
+  startX: number;
+  endX: number;
+  centerX: number;
+  guideY: number;
+  openingLength: number;
+};
+
+type ActiveSectionLengthDrag = SectionLengthHandle & {
+  startClientX: number;
+  startOpeningLength: number;
 };
 
 function DimensionLine({
@@ -1334,7 +2239,7 @@ function DimensionLine({
 }
 
 function PreviewCanvas({
-  inputs,
+  design,
   viewMode,
   fillMode,
   colorTheme,
@@ -1344,8 +2249,17 @@ function PreviewCanvas({
   onExplodedAmountChange,
   assemblyVisibility,
   onAssemblyVisibilityChange,
+  onAdjustableOpeningChange,
+  onHybridOpeningChange,
+  onShelfLengthChange,
+  onHybridSectionLengthChange,
 }: PreviewProps) {
+  const svgRef = useRef<SVGSVGElement | null>(null);
   const t = UI_STRINGS[locale];
+  const inputs = design.normalizedInputs;
+  const [activeOpeningDrag, setActiveOpeningDrag] = useState<OpeningHandle | null>(null);
+  const [activeSectionLengthDrag, setActiveSectionLengthDrag] = useState<ActiveSectionLengthDrag | null>(null);
+  const primarySection = design.renderLayout.sections[0];
   const width = 760;
   const height = 540;
   const panelMargin = 52;
@@ -1357,12 +2271,11 @@ function PreviewCanvas({
   const annotationInsetLeft = 108;
   const annotationInsetTop = 40;
   const annotationInsetBottom = 124;
-  const isTopSurface = inputs.furnitureType === "top-surface";
-  const { frameCount, framePositions, actualClearSpan } = deriveFrameLayout(
-    inputs.length,
-    inputs.maxSpan,
-  );
-  const shelfLevels = inputs.furnitureType === "shelving" ? inputs.shelfLevelCount : 1;
+  const isBench = inputs.furnitureType === "bench";
+  const frameCount = primarySection.frameCount;
+  const framePositions = primarySection.framePositions;
+  const actualClearSpan = primarySection.actualClearSpan;
+  const shelfLevels = primarySection.levelBottoms.length;
   const explodeFactor = viewMode === "assembly" ? (explodedAmount / 100) * 5 : 0;
   const assemblySidebarWidth = 190;
   const effectiveAnnotationInsetLeft = isAssemblyLikeView ? 76 : annotationInsetLeft;
@@ -1373,9 +2286,7 @@ function PreviewCanvas({
   const annotationFrameHeight = capsuleHeight - annotationInsetTop - annotationInsetBottom;
 
   const boardCount =
-    inputs.furnitureType === "top-surface"
-      ? Math.max(1, Math.floor(inputs.depth / BOARD_WIDTH))
-      : Math.max(1, Math.floor((inputs.depth - 2 * BOARD_THICKNESS) / BOARD_WIDTH));
+    primarySection.boardCountPerLevel;
 
   const viewWidth =
     viewMode === "side"
@@ -1504,50 +2415,86 @@ function PreviewCanvas({
   const bottomRailBottom = inputs.bottomRailClearance;
   const bottomRailTop = bottomRailBottom + BOARD_THICKNESS;
   const innerDepth = inputs.depth - 2 * BOARD_THICKNESS;
-  const visibleLegHeight = isTopSurface ? inputs.height - BOARD_THICKNESS : inputs.height;
+  const visibleLegHeight = isBench ? inputs.height - BOARD_THICKNESS : inputs.height;
   const assemblyLegHeight =
-    inputs.furnitureType === "shelving" ? visibleLegHeight + BOARD_THICKNESS : visibleLegHeight;
+    inputs.furnitureType === "shelf" ? visibleLegHeight + BOARD_THICKNESS : visibleLegHeight;
   const sectionRadius = Math.max(2, Math.min(8, BOARD_THICKNESS * scale * 0.45));
-  const boardGap =
-    boardCount <= 1 ? 0 : Math.max(0, (innerDepth - boardCount * BOARD_WIDTH) / (boardCount - 1));
-  const shelfBoardOffsets = Array.from({ length: boardCount }, (_, index) => {
-    return BOARD_THICKNESS + index * (BOARD_WIDTH + boardGap);
-  });
+  const shelfBoardOffsets = primarySection.boardOffsets;
+  const shelfBoardGap = primarySection.boardGap;
   const topBoardGap =
     boardCount <= 1 ? 0 : Math.max(0, (inputs.depth - boardCount * BOARD_WIDTH) / (boardCount - 1));
   const topBoardSideOffsets = Array.from({ length: boardCount }, (_, index) => {
     return index * (BOARD_WIDTH + topBoardGap);
   });
-  const sameLevelBoardGap = isTopSurface ? topBoardGap : boardGap;
-  const sameLevelBoardOffsets = isTopSurface ? topBoardSideOffsets : shelfBoardOffsets;
+  const sameLevelBoardGap = isBench ? topBoardGap : shelfBoardGap;
+  const sameLevelBoardOffsets = isBench ? topBoardSideOffsets : shelfBoardOffsets;
+  const rawWorldSections = design.layout.sections.map((section) => ({
+    ...section,
+    worldFramePositions: section.framePositions.map((position) => section.offsetX + position),
+  }));
+  const renderWorldSections = design.renderLayout.sections.map((section) => ({
+    ...section,
+    worldFramePositions: section.framePositions.map((position) => section.offsetX + position),
+  }));
+  const invalidLevelKeys = new Set(
+    rawWorldSections.flatMap((section) => {
+      const renderedSection = renderWorldSections.find(
+        (candidate) => candidate.sectionId === section.sectionId,
+      );
+      const renderedLevels = new Set(
+        (renderedSection?.levelBottoms ?? []).map((bottom) => bottom.toFixed(3)),
+      );
+
+      return section.levelBottoms
+        .filter((bottom) => !renderedLevels.has(bottom.toFixed(3)))
+        .map((bottom) => `${section.sectionId}-${bottom.toFixed(3)}`);
+    }),
+  );
+  const uniqueWorldFramePositions = Array.from(
+    new Set(
+      rawWorldSections.flatMap((section) =>
+        section.worldFramePositions.map((position) => position.toFixed(3)),
+      ),
+    ),
+  )
+    .map((position) => Number(position))
+    .sort((a, b) => a - b);
+  const uniqueFrameLevelPlacements = Array.from(
+    new Map(
+      rawWorldSections.flatMap((section) =>
+        section.levelBottoms.flatMap((bottom) =>
+          section.worldFramePositions.map((position) => [
+            `${bottom.toFixed(3)}-${position.toFixed(3)}`,
+            {
+              bottom,
+              position,
+              invalid: invalidLevelKeys.has(`${section.sectionId}-${bottom.toFixed(3)}`),
+            },
+          ] as const),
+        ),
+      ),
+    ).values(),
+  );
 
   const frameLeftPositions = framePositions;
-  const frontFramePositions = framePositions;
+  const frontFramePositions = uniqueWorldFramePositions;
 
-  const levelBottoms =
-    inputs.furnitureType === "shelving"
-      ? Array.from({ length: shelfLevels }, (_, index) => {
-          if (shelfLevels === 1) {
-            return inputs.height - 2 * BOARD_THICKNESS;
-          }
-
-          const firstBottom = inputs.bottomRailClearance;
-          const lastBottom = inputs.height - 2 * BOARD_THICKNESS;
-          const step = (lastBottom - firstBottom) / (shelfLevels - 1);
-          return firstBottom + step * index;
-        })
-      : [];
+  const levelBottoms = primarySection.levelBottoms;
+  const sideViewSections = rawWorldSections.map((section, index) => ({
+    ...section,
+    ghosted: inputs.furnitureType === "shelf" && inputs.shelfMode === "hybrid" && index > 0,
+  }));
   const levelGap =
-    !isTopSurface && levelBottoms.length > 1
+    !isBench && levelBottoms.length > 1
       ? Math.max(0, levelBottoms[1] - (levelBottoms[0] + 2 * BOARD_THICKNESS))
       : 0;
   const rearLegBaseHeight =
-    !isTopSurface && inputs.frameMode === "p-frame" && levelBottoms.length > 0
+    !isBench && inputs.frameMode === "p-frame" && levelBottoms.length > 0
       ? bottomRailBottom
       : 0;
   const rearLegVisibleHeight = Math.max(0, visibleLegHeight - rearLegBaseHeight);
   const assemblyRearLegBaseHeight =
-    rearLegBaseHeight + (!isTopSurface && inputs.frameMode === "p-frame" ? BOARD_THICKNESS : 0);
+    rearLegBaseHeight + (!isBench && inputs.frameMode === "p-frame" ? BOARD_THICKNESS : 0);
   const assemblyRearLegHeight = Math.max(0, assemblyLegHeight - assemblyRearLegBaseHeight);
   const explodedBoardLift = viewMode === "assembly" ? BOARD_THICKNESS * 2 * explodeFactor : 0;
   const explodedRailLift = viewMode === "assembly" ? BOARD_THICKNESS * 0.9 * explodeFactor : 0;
@@ -1556,7 +2503,7 @@ function PreviewCanvas({
   const explodedBackSpread = viewMode === "assembly" ? BOARD_THICKNESS * 1.1 * explodeFactor : 0;
 
   const screwColor = "#5f2f1f";
-  const legendItems = isTopSurface
+  const legendItems = isBench
     ? [
         { label: t.topBoards, color: boardColor, kind: "board" as const },
         { label: t.verticalLegs, color: legColor, kind: "leg" as const },
@@ -1611,6 +2558,276 @@ function PreviewCanvas({
       ? (faceColor: string) =>
           faceColor === railColor ? 1 : 0.5
       : () => 1;
+  const invalidStrokeDasharray = "8 5";
+  const invalidFillOpacity = 0.24;
+  const invalidStrokeOpacity = 0.7;
+  const ghostFillOpacity = 0.2;
+  const ghostStrokeOpacity = 0.55;
+  const ghostStrokeDasharray = "6 4";
+  const geometryEpsilon = 0.001;
+  const isInvalidShelfLevel = (sectionId: string, bottom: number) =>
+    invalidLevelKeys.has(`${sectionId}-${bottom.toFixed(3)}`);
+  const getLevelMaterialStyle = (fillColor: string, strokeColor: string, invalid: boolean) =>
+    invalid
+      ? {
+          fill: colorWithAlpha("#c7c2ba", invalidFillOpacity),
+          stroke: colorWithAlpha(strokeColor, invalidStrokeOpacity),
+          strokeDasharray: invalidStrokeDasharray,
+        }
+      : {
+          fill: fillColor,
+          stroke: strokeColor,
+          strokeDasharray: undefined,
+        };
+  const getGhostMaterialStyle = (fillColor: string, strokeColor: string) => ({
+    fill: colorWithAlpha(fillColor, ghostFillOpacity),
+    stroke: colorWithAlpha(strokeColor, ghostStrokeOpacity),
+    strokeDasharray: ghostStrokeDasharray,
+  });
+  const valuesMatch = (left: number, right: number) => Math.abs(left - right) <= geometryEpsilon;
+  const getShelfBoardEdgeMask = (
+    section: (typeof rawWorldSections)[number],
+    bottom: number,
+    offset: number,
+  ): PrismEdgeMask => {
+    if (inputs.furnitureType !== "shelf" || inputs.shelfMode !== "hybrid") {
+      return {};
+    }
+
+    const hasLeftNeighbor = rawWorldSections.some(
+      (candidate) =>
+        candidate.sectionId !== section.sectionId &&
+        valuesMatch(candidate.offsetX + candidate.length, section.offsetX) &&
+        candidate.levelBottoms.some((candidateBottom) => valuesMatch(candidateBottom, bottom)) &&
+        candidate.boardOffsets.some((candidateOffset) => valuesMatch(candidateOffset, offset)),
+    );
+    const hasRightNeighbor = rawWorldSections.some(
+      (candidate) =>
+        candidate.sectionId !== section.sectionId &&
+        valuesMatch(section.offsetX + section.length, candidate.offsetX) &&
+        candidate.levelBottoms.some((candidateBottom) => valuesMatch(candidateBottom, bottom)) &&
+        candidate.boardOffsets.some((candidateOffset) => valuesMatch(candidateOffset, offset)),
+    );
+
+    return {
+      hideRightFace: hasRightNeighbor,
+      hideTopLeftEdge: hasLeftNeighbor,
+      hideTopRightEdge: hasRightNeighbor,
+      hideBackLeftEdge: hasLeftNeighbor,
+      hideBackRightEdge: hasRightNeighbor,
+    };
+  };
+  const getMergedShelfBoardSpans = (bottom: number, offset: number) => {
+    const segments = rawWorldSections
+      .filter(
+        (section) =>
+          section.levelBottoms.some((levelBottom) => valuesMatch(levelBottom, bottom)) &&
+          section.boardOffsets.some((boardOffset) => valuesMatch(boardOffset, offset)),
+      )
+      .map((section) => ({
+        sectionId: section.sectionId,
+        x: section.offsetX,
+        width: section.length,
+        invalid: isInvalidShelfLevel(section.sectionId, bottom),
+      }))
+      .sort((left, right) => left.x - right.x);
+
+    return segments.reduce<
+      { key: string; x: number; width: number; invalid: boolean; sectionIds: string[] }[]
+    >((merged, segment) => {
+      const previous = merged[merged.length - 1];
+
+      if (previous && segment.x <= previous.x + previous.width + geometryEpsilon) {
+        previous.width = Math.max(previous.width, segment.x + segment.width - previous.x);
+        previous.invalid = previous.invalid || segment.invalid;
+        previous.sectionIds.push(segment.sectionId);
+        previous.key = previous.sectionIds.join("-");
+        return merged;
+      }
+
+      merged.push({
+        key: segment.sectionId,
+        x: segment.x,
+        width: segment.width,
+        invalid: segment.invalid,
+        sectionIds: [segment.sectionId],
+      });
+      return merged;
+    }, []);
+  };
+  const openingHandles = useMemo<OpeningHandle[]>(() => {
+    if (inputs.furnitureType !== "shelf" || inputs.shelfMode === "fixed") {
+      return [];
+    }
+
+    const sectionOpenings =
+      inputs.shelfMode === "adjustable"
+        ? [{ sectionId: "shelf-main", section: "adjustable" as const, openings: inputs.clearOpenings }]
+        : [
+            { sectionId: "left", section: "left" as const, openings: inputs.sections[0].clearOpenings },
+            { sectionId: "right", section: "right" as const, openings: inputs.sections[1].clearOpenings },
+          ];
+
+    return sectionOpenings.flatMap(({ sectionId, section, openings }) => {
+      const layoutSection = rawWorldSections.find((candidate) => candidate.sectionId === sectionId);
+
+      if (!layoutSection) {
+        return [];
+      }
+
+      return openings
+        .map((opening, openingIndex) => {
+          const lowerBottom = layoutSection.levelBottoms[openingIndex];
+          const upperBottom = layoutSection.levelBottoms[openingIndex + 1];
+
+          if (!Number.isFinite(lowerBottom) || !Number.isFinite(upperBottom)) {
+            return null;
+          }
+
+          return {
+            key: `${sectionId}-${openingIndex}`,
+            sectionId,
+            section,
+            openingIndex,
+            x: layoutSection.offsetX + layoutSection.length / 2,
+            centerHeight: upperBottom - opening / 2,
+            openingHeight: opening,
+            lowerTop: lowerBottom + 2 * BOARD_THICKNESS,
+            upperBottom,
+          };
+        })
+        .filter((handle): handle is OpeningHandle => Boolean(handle));
+    });
+  }, [inputs, rawWorldSections]);
+
+  const sectionLengthHandles = useMemo<SectionLengthHandle[]>(() => {
+    if (viewMode !== "front" || inputs.furnitureType !== "shelf") {
+      return [];
+    }
+
+    const guideY = Math.min(yBottom(0) + 34, capsuleY + capsuleHeight - 42);
+
+    if (inputs.shelfMode !== "hybrid") {
+      const openingLength = Math.max(BOARD_WIDTH, inputs.length - 2 * BOARD_THICKNESS);
+
+      return [
+        {
+          key: "section-length-single",
+          section: "single",
+          startX: BOARD_THICKNESS,
+          endX: inputs.length - BOARD_THICKNESS,
+          centerX: inputs.length / 2,
+          guideY,
+          openingLength,
+        },
+      ];
+    }
+
+    return rawWorldSections
+      .filter(
+        (section): section is (typeof rawWorldSections)[number] & { sectionId: HybridSectionId } =>
+          section.sectionId === "left" || section.sectionId === "right",
+      )
+      .map((section) => ({
+        key: `section-length-${section.sectionId}`,
+        section: section.sectionId,
+        startX: section.offsetX + BOARD_THICKNESS,
+        endX: section.offsetX + section.length - BOARD_THICKNESS,
+        centerX: section.offsetX + section.length / 2,
+        guideY,
+        openingLength: Math.max(BOARD_WIDTH, section.length - 2 * BOARD_THICKNESS),
+      }));
+  }, [capsuleHeight, capsuleY, inputs, rawWorldSections, viewMode, yBottom]);
+
+  useEffect(() => {
+    if (!activeOpeningDrag) {
+      return;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const svg = svgRef.current;
+
+      if (!svg) {
+        return;
+      }
+
+      const rect = svg.getBoundingClientRect();
+      const svgY = ((event.clientY - rect.top) / rect.height) * height;
+      const centerHeight = (originY + contentHeight - svgY) / scale;
+      const nextOpening = Math.max(
+        BOARD_THICKNESS,
+        snapToHalfInch(2 * (activeOpeningDrag.upperBottom - centerHeight)),
+      );
+
+      if (activeOpeningDrag.section === "adjustable") {
+        onAdjustableOpeningChange(activeOpeningDrag.openingIndex, nextOpening);
+        return;
+      }
+
+      onHybridOpeningChange(activeOpeningDrag.section, activeOpeningDrag.openingIndex, nextOpening);
+    };
+
+    const stopDragging = () => setActiveOpeningDrag(null);
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopDragging);
+    window.addEventListener("pointercancel", stopDragging);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopDragging);
+      window.removeEventListener("pointercancel", stopDragging);
+    };
+  }, [
+    activeOpeningDrag,
+    contentHeight,
+    height,
+    onAdjustableOpeningChange,
+    onHybridOpeningChange,
+    originY,
+    scale,
+  ]);
+
+  useEffect(() => {
+    if (!activeSectionLengthDrag) {
+      return;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const svg = svgRef.current;
+
+      if (!svg) {
+        return;
+      }
+
+      const rect = svg.getBoundingClientRect();
+      const worldDeltaX = ((event.clientX - activeSectionLengthDrag.startClientX) / rect.width) * width / scale;
+      const steppedDeltaX = Math.trunc(worldDeltaX);
+      const nextOpeningLength = Math.max(
+        BOARD_WIDTH,
+        activeSectionLengthDrag.startOpeningLength + steppedDeltaX,
+      );
+
+      if (activeSectionLengthDrag.section === "single") {
+        onShelfLengthChange(nextOpeningLength);
+        return;
+      }
+
+      onHybridSectionLengthChange(activeSectionLengthDrag.section, nextOpeningLength);
+    };
+
+    const stopDragging = () => setActiveSectionLengthDrag(null);
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopDragging);
+    window.addEventListener("pointercancel", stopDragging);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopDragging);
+      window.removeEventListener("pointercancel", stopDragging);
+    };
+  }, [activeSectionLengthDrag, onHybridSectionLengthChange, onShelfLengthChange, scale, width]);
 
   const assemblySkewX = 0.52;
   const assemblySkewY = 0.28;
@@ -1624,11 +2841,44 @@ function PreviewCanvas({
   const assemblyControlHeight = 252;
   const assemblyControlY = capsuleY + (capsuleHeight - assemblyControlHeight) / 2 - 18;
 
+  const renderAxisHandle = (centerX: number, centerY: number, axis: "x" | "y") => {
+    const arm = 4.75;
+    const arrow = 2.5;
+
+    return (
+      <g className="drag-handle-icon" aria-hidden="true">
+        {axis === "x" ? (
+          <>
+            <line x1={centerX - arm} y1={centerY} x2={centerX + arm} y2={centerY} />
+            <path
+              d={`M ${centerX - arm - arrow} ${centerY} L ${centerX - arm} ${centerY - arrow} L ${centerX - arm} ${centerY + arrow} Z`}
+            />
+            <path
+              d={`M ${centerX + arm + arrow} ${centerY} L ${centerX + arm} ${centerY - arrow} L ${centerX + arm} ${centerY + arrow} Z`}
+            />
+          </>
+        ) : (
+          <>
+            <line x1={centerX} y1={centerY - arm} x2={centerX} y2={centerY + arm} />
+            <path
+              d={`M ${centerX} ${centerY - arm - arrow} L ${centerX - arrow} ${centerY - arm} L ${centerX + arrow} ${centerY - arm} Z`}
+            />
+            <path
+              d={`M ${centerX} ${centerY + arm + arrow} L ${centerX - arrow} ${centerY + arm} L ${centerX + arrow} ${centerY + arm} Z`}
+            />
+          </>
+        )}
+      </g>
+    );
+  };
+
   const renderPrism = (
     key: string,
     prism: { x: number; y: number; z: number; width: number; height: number; depth: number },
     faceColor: string,
     edgeColor: string,
+    invalid = false,
+    edgeMask: PrismEdgeMask = {},
   ) => {
     const frontBottomLeft = assemblyProject(prism.x, prism.y, prism.z + prism.depth);
     const frontBottomRight = assemblyProject(prism.x + prism.width, prism.y, prism.z + prism.depth);
@@ -1642,33 +2892,89 @@ function PreviewCanvas({
     const facePoints = (points: { x: number; y: number }[]) =>
       points.map((point) => `${point.x},${point.y}`).join(" ");
     const alpha = assemblyPatternAlpha(faceColor);
+    const horizontalFaceFill = invalid
+      ? colorWithAlpha("#c7c2ba", invalidFillOpacity)
+      : colorWithAlpha(tintColor(faceColor, 0.2), alpha);
+    const backFaceFill = invalid
+      ? colorWithAlpha("#c7c2ba", invalidFillOpacity)
+      : colorWithAlpha(tintColor(faceColor, 0.08), alpha);
     const faces = [
       {
         id: "right",
         points: [backBottomRight, frontBottomRight, frontTopRight, backTopRight],
         fill: colorWithAlpha(tintColor(faceColor, -0.12), alpha),
+        hidden: edgeMask.hideRightFace,
       },
       {
         id: "top",
         points: [backBottomLeft, backBottomRight, backTopRight, backTopLeft],
-        fill: colorWithAlpha(tintColor(faceColor, 0.08), alpha),
+        fill: backFaceFill,
       },
       {
         id: "back",
         points: [frontTopLeft, frontTopRight, backTopRight, backTopLeft],
-        fill: colorWithAlpha(tintColor(faceColor, 0.2), alpha),
+        fill: horizontalFaceFill,
       },
     ];
+    const seamMasks = [
+      edgeMask.hideTopLeftEdge
+        ? {
+            id: "top-left",
+            p1: frontTopLeft,
+            p2: backTopLeft,
+            color: horizontalFaceFill,
+          }
+        : null,
+      edgeMask.hideTopRightEdge
+        ? {
+            id: "top-right",
+            p1: frontTopRight,
+            p2: backTopRight,
+            color: horizontalFaceFill,
+          }
+        : null,
+      edgeMask.hideBackLeftEdge
+        ? {
+            id: "back-left",
+            p1: backBottomLeft,
+            p2: backTopLeft,
+            color: backFaceFill,
+          }
+        : null,
+      edgeMask.hideBackRightEdge
+        ? {
+            id: "back-right",
+            p1: backBottomRight,
+            p2: backTopRight,
+            color: backFaceFill,
+          }
+        : null,
+    ].filter((mask): mask is { id: string; p1: { x: number; y: number }; p2: { x: number; y: number }; color: string } => Boolean(mask));
 
     return (
       <g key={key}>
         {faces.map((face) => (
+          face.hidden ? null : (
           <polygon
             key={`${key}-${face.id}`}
             points={facePoints(face.points)}
-            fill={face.fill}
-            stroke={edgeColor}
+            fill={invalid ? colorWithAlpha("#c7c2ba", invalidFillOpacity) : face.fill}
+            stroke={invalid ? colorWithAlpha(edgeColor, invalidStrokeOpacity) : edgeColor}
             strokeWidth={materialStrokeWidth}
+            strokeDasharray={invalid ? invalidStrokeDasharray : undefined}
+          />
+          )
+        ))}
+        {seamMasks.map((mask) => (
+          <line
+            key={`${key}-mask-${mask.id}`}
+            x1={mask.p1.x}
+            y1={mask.p1.y}
+            x2={mask.p2.x}
+            y2={mask.p2.y}
+            stroke={mask.color}
+            strokeWidth={materialStrokeWidth + 1.25}
+            strokeLinecap="round"
           />
         ))}
       </g>
@@ -1686,7 +2992,7 @@ function PreviewCanvas({
 
   return (
     <div className="preview-canvas">
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={locale === "en" ? `${viewMode} view` : `${t.preview}${t[viewMode]}`}>
+      <svg ref={svgRef} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={locale === "en" ? `${viewMode} view` : `${t.preview}${t[viewMode]}`}>
         <defs>
           <pattern id="boardPattern" width="8" height="8" patternUnits="userSpaceOnUse">
             <circle cx="2" cy="2" r="0.8" fill={boardColor} />
@@ -1717,7 +3023,7 @@ function PreviewCanvas({
 
         {viewMode === "top" ? (
           <>
-            {frameLeftPositions.map((left, index) => (
+            {frontFramePositions.map((left, index) => (
               <g key={`top-frame-${index}`}>
                 <rect
                   x={x(left)}
@@ -1749,7 +3055,7 @@ function PreviewCanvas({
               </g>
             ))}
 
-            {isTopSurface
+            {isBench
               ? Array.from({ length: boardCount }, (_, index) => {
                   const gap =
                     boardCount <= 1
@@ -1770,20 +3076,22 @@ function PreviewCanvas({
                     />
                   );
                 })
-              : shelfBoardOffsets.map((offset, index) => (
-                  <rect
-                    key={`top-shelf-board-${index}`}
-                    x={x(0)}
-                    y={yTop(offset)}
-                    width={contentWidth}
-                    height={BOARD_WIDTH * scale}
-                    fill={boardFill}
-                    stroke={boardLineColor}
-                    strokeWidth={materialStrokeWidth}
-                  />
-                ))}
+              : rawWorldSections.flatMap((section) =>
+                  section.boardOffsets.map((offset, index) => (
+                    <rect
+                      key={`top-shelf-board-${section.sectionId}-${index}`}
+                      x={x(section.offsetX)}
+                      y={yTop(offset)}
+                      width={section.length * scale}
+                      height={BOARD_WIDTH * scale}
+                      fill={boardFill}
+                      stroke={boardLineColor}
+                      strokeWidth={materialStrokeWidth}
+                    />
+                  )),
+                )}
 
-            {frameLeftPositions.map((left, index) => {
+            {frontFramePositions.map((left, index) => {
               const centerX = x(left + BOARD_WIDTH / 2);
               return (
                 <g key={`top-screws-${index}`}>
@@ -1850,9 +3158,9 @@ function PreviewCanvas({
 
             <rect
               x={x(0)}
-              y={yBottom(isTopSurface ? inputs.height - BOARD_THICKNESS : inputs.height)}
+              y={yBottom(isBench ? inputs.height - BOARD_THICKNESS : inputs.height)}
               width={BOARD_THICKNESS * scale}
-              height={(isTopSurface ? inputs.height - BOARD_THICKNESS : inputs.height) * scale}
+              height={(isBench ? inputs.height - BOARD_THICKNESS : inputs.height) * scale}
               fill={legFill}
               stroke={legLineColor}
               strokeWidth={materialStrokeWidth}
@@ -1860,18 +3168,18 @@ function PreviewCanvas({
             <rect
               x={x(inputs.depth - BOARD_THICKNESS)}
               y={yBottom(
-                isTopSurface
+                isBench
                   ? inputs.height - BOARD_THICKNESS
                   : rearLegBaseHeight + rearLegVisibleHeight,
               )}
               width={BOARD_THICKNESS * scale}
-              height={(isTopSurface ? inputs.height - BOARD_THICKNESS : rearLegVisibleHeight) * scale}
+              height={(isBench ? inputs.height - BOARD_THICKNESS : rearLegVisibleHeight) * scale}
               fill={legFill}
               stroke={legLineColor}
               strokeWidth={materialStrokeWidth}
             />
 
-            {isTopSurface ? (
+            {isBench ? (
               <>
                 <rect
                   x={x(BOARD_THICKNESS)}
@@ -1928,43 +3236,65 @@ function PreviewCanvas({
               </>
             ) : (
               <>
-                {levelBottoms.map((bottom, index) => (
-                  <g key={`shelf-level-${index}`}>
-                    <rect
-                      x={x(BOARD_THICKNESS)}
-                      y={yBottom(bottom + BOARD_THICKNESS)}
-                      width={(inputs.depth - 2 * BOARD_THICKNESS) * scale}
-                      height={BOARD_THICKNESS * scale}
-                      fill={railFill}
-                      stroke={railLineColor}
-                      strokeWidth={materialStrokeWidth}
-                    />
-                    {shelfBoardOffsets.map((offset, boardIndex) => (
-                      <rect
-                        key={`shelf-board-${index}-${boardIndex}`}
-                        x={x(offset)}
-                        y={yBottom(bottom + 2 * BOARD_THICKNESS)}
-                        width={BOARD_WIDTH * scale}
-                        height={BOARD_THICKNESS * scale}
-                        rx={sectionRadius}
-                        ry={sectionRadius}
-                        fill={boardFill}
-                        stroke={boardLineColor}
-                        strokeWidth={materialStrokeWidth}
-                      />
-                    ))}
-                    {renderScrewMark(
-                      x(BOARD_THICKNESS),
-                      yBottom(bottom + BOARD_THICKNESS / 2),
-                      `shelf-side-left-${index}`,
-                    )}
-                    {renderScrewMark(
-                      x(inputs.depth - BOARD_THICKNESS),
-                      yBottom(bottom + BOARD_THICKNESS / 2),
-                      `shelf-side-right-${index}`,
-                    )}
-                  </g>
-                ))}
+                {sideViewSections.flatMap((section, sectionIndex) =>
+                  section.levelBottoms.map((bottom, index) => {
+                    const invalid = isInvalidShelfLevel(section.sectionId, bottom);
+                    const railStyle = invalid
+                      ? getLevelMaterialStyle(railFill, railLineColor, true)
+                      : section.ghosted
+                        ? getGhostMaterialStyle(railFill, railLineColor)
+                        : getLevelMaterialStyle(railFill, railLineColor, false);
+                    const boardStyle = invalid
+                      ? getLevelMaterialStyle(boardFill, boardLineColor, true)
+                      : section.ghosted
+                        ? getGhostMaterialStyle(boardFill, boardLineColor)
+                        : getLevelMaterialStyle(boardFill, boardLineColor, false);
+
+                    return (
+                      <g key={`shelf-level-${section.sectionId}-${index}`}>
+                        <rect
+                          x={x(BOARD_THICKNESS)}
+                          y={yBottom(bottom + BOARD_THICKNESS)}
+                          width={(inputs.depth - 2 * BOARD_THICKNESS) * scale}
+                          height={BOARD_THICKNESS * scale}
+                          fill={railStyle.fill}
+                          stroke={railStyle.stroke}
+                          strokeWidth={materialStrokeWidth}
+                          strokeDasharray={railStyle.strokeDasharray}
+                        />
+                        {shelfBoardOffsets.map((offset, boardIndex) => (
+                          <rect
+                            key={`shelf-board-${section.sectionId}-${index}-${boardIndex}`}
+                            x={x(offset)}
+                            y={yBottom(bottom + 2 * BOARD_THICKNESS)}
+                            width={BOARD_WIDTH * scale}
+                            height={BOARD_THICKNESS * scale}
+                            rx={sectionRadius}
+                            ry={sectionRadius}
+                            fill={boardStyle.fill}
+                            stroke={boardStyle.stroke}
+                            strokeWidth={materialStrokeWidth}
+                            strokeDasharray={boardStyle.strokeDasharray}
+                          />
+                        ))}
+                        {!section.ghosted
+                          ? [
+                              renderScrewMark(
+                                x(BOARD_THICKNESS),
+                                yBottom(bottom + BOARD_THICKNESS / 2),
+                                `shelf-side-left-${sectionIndex}-${index}`,
+                              ),
+                              renderScrewMark(
+                                x(inputs.depth - BOARD_THICKNESS),
+                                yBottom(bottom + BOARD_THICKNESS / 2),
+                                `shelf-side-right-${sectionIndex}-${index}`,
+                              ),
+                            ]
+                          : null}
+                      </g>
+                    );
+                  }),
+                )}
               </>
             )}
 
@@ -2015,7 +3345,7 @@ function PreviewCanvas({
               textY={yBottom(bottomRailBottom / 2) - 10}
               textAnchor="start"
             />
-            {!isTopSurface && levelGap > 0.001 ? (
+            {!isBench && levelGap > 0.001 ? (
               <DimensionLine
                 x1={Math.min(capsuleX + capsuleWidth - 24, rightDimX + 40)}
                 y1={yBottom(levelBottoms[0] + 2 * BOARD_THICKNESS)}
@@ -2032,7 +3362,7 @@ function PreviewCanvas({
 
         {isAssemblyLikeView ? (
           <>
-            {isTopSurface ? (
+            {isBench ? (
               <>
                 {assemblyVisibility.legs
                   ? frameLeftPositions.map((left, index) =>
@@ -2121,42 +3451,69 @@ function PreviewCanvas({
             ) : (
               <>
                 {(() => {
-                  const topLevelIndex = levelBottoms.length - 1;
-                  const renderShelfLevel = (bottom: number, levelIndex: number) => (
-                    <g key={`assembly-shelf-level-${levelIndex}`}>
-                      {assemblyVisibility.rails
-                        ? frameLeftPositions.map((left, frameIndex) =>
-                            renderPrism(
-                              `assembly-shelf-rail-${levelIndex}-${frameIndex}`,
-                              offsetPrism({
-                                x: left,
-                                y: bottom + BOARD_THICKNESS,
-                                z: BOARD_THICKNESS,
-                                width: BOARD_WIDTH,
-                                height: BOARD_THICKNESS,
-                                depth: inputs.depth - 2 * BOARD_THICKNESS,
-                              }, { y: explodedRailLift }),
-                              railColor,
-                              railLineColor,
-                            ),
-                          )
-                        : null}
+                  const renderSectionShelfRails = (
+                    section: (typeof rawWorldSections)[number],
+                    bottom: number,
+                    levelIndex: number,
+                  ) => {
+                    const invalid = isInvalidShelfLevel(section.sectionId, bottom);
+
+                    return (
+                      <g key={`assembly-shelf-rails-${section.sectionId}-${levelIndex}`}>
+                        {assemblyVisibility.rails
+                          ? section.worldFramePositions.map((left, frameIndex) =>
+                              renderPrism(
+                                `assembly-shelf-rail-${section.sectionId}-${levelIndex}-${frameIndex}`,
+                                offsetPrism({
+                                  x: left,
+                                  y: bottom + BOARD_THICKNESS,
+                                  z: BOARD_THICKNESS,
+                                  width: BOARD_WIDTH,
+                                  height: BOARD_THICKNESS,
+                                  depth: inputs.depth - 2 * BOARD_THICKNESS,
+                                }, { y: explodedRailLift }),
+                                railColor,
+                                railLineColor,
+                                invalid,
+                              ),
+                            )
+                          : null}
+                      </g>
+                    );
+                  };
+
+                  const renderSectionShelfBoards = (
+                    section: (typeof rawWorldSections)[number],
+                    bottom: number,
+                    levelIndex: number,
+                  ) => (
+                    <g key={`assembly-shelf-boards-${section.sectionId}-${levelIndex}`}>
                       {assemblyVisibility.boards
-                        ? [...shelfBoardOffsets].reverse().map((offset, boardIndex) =>
-                            renderPrism(
-                              `assembly-shelf-board-${levelIndex}-${boardIndex}`,
+                        ? [...section.boardOffsets].reverse().flatMap((offset, boardIndex) => {
+                            const mergedSpans = getMergedShelfBoardSpans(bottom, offset);
+                            const owningSpan = mergedSpans.find((span) =>
+                              span.sectionIds.includes(section.sectionId),
+                            );
+
+                            if (!owningSpan || owningSpan.sectionIds[0] !== section.sectionId) {
+                              return [];
+                            }
+
+                            return renderPrism(
+                              `assembly-shelf-board-${owningSpan.key}-${levelIndex}-${boardIndex}`,
                               offsetPrism({
-                                x: 0,
+                                x: owningSpan.x,
                                 y: bottom + 2 * BOARD_THICKNESS,
                                 z: offset,
-                                width: inputs.length,
+                                width: owningSpan.width,
                                 height: BOARD_THICKNESS,
                                 depth: BOARD_WIDTH,
                               }, { y: explodedBoardLift }),
                               boardColor,
                               boardLineColor,
-                            ),
-                          )
+                              owningSpan.invalid,
+                            );
+                          })
                         : null}
                     </g>
                   );
@@ -2164,7 +3521,7 @@ function PreviewCanvas({
                   return (
                     <>
                       {assemblyVisibility.legs
-                        ? frameLeftPositions.map((left, index) =>
+                        ? frontFramePositions.map((left, index) =>
                             renderPrism(
                               `assembly-shelf-back-leg-${index}`,
                               offsetPrism({
@@ -2180,12 +3537,18 @@ function PreviewCanvas({
                             ),
                           )
                         : null}
-                      {levelBottoms
-                        .slice(0, Math.max(0, topLevelIndex))
-                        .map((bottom, levelIndex) => renderShelfLevel(bottom, levelIndex))}
-                      {topLevelIndex >= 0 ? renderShelfLevel(levelBottoms[topLevelIndex], topLevelIndex) : null}
+                      {rawWorldSections.flatMap((section) =>
+                        section.levelBottoms.map((bottom, levelIndex) =>
+                          renderSectionShelfRails(section, bottom, levelIndex),
+                        ),
+                      )}
+                      {rawWorldSections.flatMap((section) =>
+                        section.levelBottoms.map((bottom, levelIndex) =>
+                          renderSectionShelfBoards(section, bottom, levelIndex),
+                        ),
+                      )}
                       {assemblyVisibility.legs
-                        ? frameLeftPositions.map((left, index) =>
+                        ? frontFramePositions.map((left, index) =>
                             renderPrism(
                               `assembly-shelf-front-leg-${index}`,
                               offsetPrism({
@@ -2229,7 +3592,7 @@ function PreviewCanvas({
               {t.floorZero}
             </text>
 
-            {isTopSurface
+            {isBench
               ? frontFramePositions.map((left, index) => (
                   <g key={`front-rail-pair-${index}`}>
                     <rect
@@ -2252,34 +3615,43 @@ function PreviewCanvas({
                     />
                   </g>
                 ))
-              : levelBottoms.flatMap((bottom, levelIndex) =>
-                  frontFramePositions.map((left, frameIndex) => (
+              : uniqueFrameLevelPlacements.map(({ bottom, position, invalid }, placementIndex) => {
+                  const railStyle = getLevelMaterialStyle(railFill, railLineColor, invalid);
+
+                  return (
                     <rect
-                      key={`front-shelf-rail-${levelIndex}-${frameIndex}`}
-                      x={x(left)}
+                      key={`front-shelf-rail-${placementIndex}`}
+                      x={x(position)}
                       y={yBottom(bottom + BOARD_THICKNESS)}
                       width={BOARD_WIDTH * scale}
                       height={BOARD_THICKNESS * scale}
-                      fill={railFill}
-                      stroke={railLineColor}
+                      fill={railStyle.fill}
+                      stroke={railStyle.stroke}
                       strokeWidth={materialStrokeWidth}
+                      strokeDasharray={railStyle.strokeDasharray}
                     />
-                  )),
-                )}
+                  )})}
 
-            {!isTopSurface
-              ? levelBottoms.map((bottom, index) => (
-                  <rect
-                    key={`front-shelf-${index}`}
-                    x={x(0)}
-                    y={yBottom(bottom + 2 * BOARD_THICKNESS)}
-                    width={contentWidth}
-                    height={BOARD_THICKNESS * scale}
-                    fill={boardFill}
-                    stroke={boardLineColor}
-                    strokeWidth={materialStrokeWidth}
-                  />
-                ))
+            {!isBench
+              ? rawWorldSections.flatMap((section) =>
+                  section.levelBottoms.map((bottom, index) => {
+                    const invalid = isInvalidShelfLevel(section.sectionId, bottom);
+                    const boardStyle = getLevelMaterialStyle(boardFill, boardLineColor, invalid);
+
+                    return (
+                    <rect
+                      key={`front-shelf-${section.sectionId}-${index}`}
+                      x={x(section.offsetX)}
+                      y={yBottom(bottom + 2 * BOARD_THICKNESS)}
+                      width={section.length * scale}
+                      height={BOARD_THICKNESS * scale}
+                      fill={boardStyle.fill}
+                      stroke={boardStyle.stroke}
+                      strokeWidth={materialStrokeWidth}
+                      strokeDasharray={boardStyle.strokeDasharray}
+                    />
+                  )}),
+                )
               : null}
 
             {frontFramePositions.map((left, index) => (
@@ -2295,7 +3667,7 @@ function PreviewCanvas({
               />
             ))}
 
-            {isTopSurface ? (
+            {isBench ? (
               <rect
                 x={x(0)}
                 y={yBottom(inputs.height)}
@@ -2307,7 +3679,7 @@ function PreviewCanvas({
               />
             ) : null}
 
-            {isTopSurface
+            {isBench
               ? frontFramePositions.map((left, index) => (
                   <g key={`front-top-screws-${index}`}>
                     {renderScrewMark(
@@ -2321,16 +3693,90 @@ function PreviewCanvas({
                       `front-top-lower-${index}`,
                     )}
                   </g>
-                ))
-              : levelBottoms.flatMap((bottom, levelIndex) =>
-                  frontFramePositions.map((left, frameIndex) =>
+                  ))
+              : uniqueFrameLevelPlacements.map(({ bottom, position }, placementIndex) =>
                     renderScrewMark(
-                      x(left + BOARD_WIDTH / 2),
+                      x(position + BOARD_WIDTH / 2),
                       yBottom(bottom + BOARD_THICKNESS / 2),
-                      `front-shelf-${levelIndex}-${frameIndex}`,
+                      `front-shelf-${placementIndex}`,
                     ),
-                  ),
-                )}
+                  )}
+
+            {inputs.furnitureType === "shelf" && inputs.shelfMode !== "fixed"
+              ? openingHandles.map((handle) => (
+                  <g
+                    key={`opening-handle-${handle.key}`}
+                    className="opening-handle"
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      setActiveOpeningDrag(handle);
+                    }}
+                    style={{ cursor: "ns-resize" }}
+                  >
+                    <g className="opening-dimension" aria-hidden="true">
+                      <line
+                        x1={x(handle.x) + 18}
+                        y1={yBottom(handle.lowerTop)}
+                        x2={x(handle.x) + 18}
+                        y2={yBottom(handle.upperBottom)}
+                      />
+                      <line
+                        x1={x(handle.x) + 13}
+                        y1={yBottom(handle.lowerTop)}
+                        x2={x(handle.x) + 23}
+                        y2={yBottom(handle.lowerTop)}
+                      />
+                      <line
+                        x1={x(handle.x) + 13}
+                        y1={yBottom(handle.upperBottom)}
+                        x2={x(handle.x) + 23}
+                        y2={yBottom(handle.upperBottom)}
+                      />
+                      <text
+                        x={x(handle.x) + 24}
+                        y={(yBottom(handle.lowerTop) + yBottom(handle.upperBottom)) / 2 - 4}
+                        textAnchor="start"
+                      >
+                        {formatInches(handle.openingHeight)}
+                      </text>
+                    </g>
+                    {renderAxisHandle(x(handle.x), yBottom(handle.centerHeight), "y")}
+                    <circle
+                      cx={x(handle.x)}
+                      cy={yBottom(handle.centerHeight)}
+                      r={15}
+                      fill="transparent"
+                    />
+                  </g>
+                ))
+              : null}
+
+            {sectionLengthHandles.map((handle) => (
+              <g
+                key={handle.key}
+                className="opening-handle section-length-handle"
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  setActiveSectionLengthDrag({
+                    ...handle,
+                    startClientX: event.clientX,
+                    startOpeningLength: handle.openingLength,
+                  });
+                }}
+                style={{ cursor: "ew-resize" }}
+              >
+                <g className="opening-dimension section-length-dimension" aria-hidden="true">
+                  <line x1={x(handle.startX)} y1={handle.guideY} x2={x(handle.endX)} y2={handle.guideY} />
+                  <line x1={x(handle.startX)} y1={handle.guideY - 5} x2={x(handle.startX)} y2={handle.guideY + 5} />
+                  <line x1={x(handle.endX)} y1={handle.guideY - 5} x2={x(handle.endX)} y2={handle.guideY + 5} />
+                  <text x={x(handle.centerX)} y={handle.guideY - 10} textAnchor="middle">
+                    {formatInches(handle.openingLength)}
+                  </text>
+                </g>
+                {renderAxisHandle(x(handle.centerX), handle.guideY, "x")}
+                <circle cx={x(handle.centerX)} cy={handle.guideY} r={16} fill="transparent" />
+              </g>
+            ))}
 
             <DimensionLine
               x1={x(0)}
@@ -2340,16 +3786,6 @@ function PreviewCanvas({
               label={fillTemplate(t.lengthLabel, { value: formatInches(inputs.length) })}
               textY={lowerFarDimTextY}
             />
-            {showClearSpanDimension ? (
-              <DimensionLine
-                x1={x(BOARD_WIDTH)}
-                y1={lowerNearDimY}
-                x2={x(BOARD_WIDTH + actualClearSpan)}
-                y2={lowerNearDimY}
-                label={fillTemplate(t.clearSpanLabel, { value: formatInches(actualClearSpan) })}
-                textY={lowerNearDimTextY}
-              />
-            ) : null}
             <DimensionLine
               x1={leftDimX}
               y1={yBottom(0)}
@@ -2440,17 +3876,6 @@ function PreviewCanvas({
           </>
         ) : null}
 
-        {issues.length > 0 ? (
-          <g
-            className="svg-warning-pill"
-            transform={`translate(${capsuleX + 18}, ${capsuleY + 16})`}
-          >
-            <rect x="0" y="0" rx="10" ry="10" width="190" height="28" />
-            <text x="95" y="18" textAnchor="middle">
-              {t.buildConstraintWarning}
-            </text>
-          </g>
-        ) : null}
       </svg>
 
       <div className="preview-legend">
@@ -2483,6 +3908,15 @@ function PreviewCanvas({
           <span>{t.screws}</span>
         </div>
       </div>
+
+      {issues.length > 0 ? (
+        <div className="preview-warning-block" role="status" aria-live="polite">
+          <strong>{t.buildConstraintWarning}</strong>
+          {issues.map((issue, index) => (
+            <span key={`preview-issue-${index}`}>{issue}</span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
