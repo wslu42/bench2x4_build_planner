@@ -207,6 +207,38 @@ select {
   min-width: 0;
 }
 
+.planner-input-group {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 251, 245, 0.82);
+  border: 1px solid rgba(154, 120, 87, 0.12);
+}
+
+.planner-input-group + .planner-input-group {
+  margin-top: 2px;
+}
+
+.planner-input-group-header h4 {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #86654a;
+}
+
+.planner-section-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.planner-section-card .field-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
 .parameterization-input-card .muted {
   max-width: 16rem;
 }
@@ -328,6 +360,24 @@ select {
   justify-content: start;
 }
 
+.planner-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.planner-inline-actions .gallery-load-pill[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.field-hint {
+  color: var(--muted-text);
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
 .panel-controls .field-grid + .panel-section {
   margin-top: 32px;
 }
@@ -355,21 +405,6 @@ select {
   background: #f3e2ce;
   color: #6f4a29;
   font-size: 0.86rem;
-}
-
-.warning-stack {
-  display: grid;
-  gap: 10px;
-}
-
-.warning-card {
-  margin: 0;
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: #fff1e8;
-  border: 1px solid #efb08a;
-  color: #9a3f10;
-  font-weight: 700;
 }
 
 .summary-grid {
@@ -500,6 +535,29 @@ select {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: #86654a;
+}
+
+.preview-warning-block {
+  display: grid;
+  gap: 4px;
+  margin: 8px 8px 4px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: #fff1e8;
+  border: 1.5px solid #efb08a;
+  color: #9a3f10;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.preview-warning-block strong {
+  display: block;
+}
+
+.preview-warning-block span {
+  display: block;
+  font-weight: 700;
 }
 
 .assembly-dimension-list {
@@ -639,17 +697,34 @@ select {
   letter-spacing: 0.08em;
 }
 
-.svg-warning-pill rect {
-  fill: #fff1e8;
-  stroke: #efb08a;
-  stroke-width: 1.5;
+.opening-dimension line {
+  stroke: rgba(123, 96, 68, 0.45);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
 }
 
-.svg-warning-pill text {
-  fill: #9a3f10;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.03em;
+.opening-dimension text {
+  fill: rgba(92, 65, 41, 0.72);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.drag-handle-icon line,
+.drag-handle-icon path {
+  stroke: #b8312b;
+  fill: #b8312b;
+  stroke-width: 0.95;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.opening-handle {
+  touch-action: none;
+}
+
+.section-length-dimension line {
+  stroke-dasharray: 4 4;
 }
 
 table {

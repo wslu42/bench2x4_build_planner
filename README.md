@@ -27,7 +27,10 @@ So this project is my nerdy attempt to make that system easier to use. I wanted 
 ## What It Supports
 
 - `Bench`
-- `Shelving`
+- `Shelf`
+- `Shelf > Fixed Shelf`
+- `Shelf > Adjustable Shelf`
+- `Shelf > Hybrid Shelf`
 
 ## What It Does
 
@@ -60,6 +63,12 @@ Shelving supports two frame modes:
 
 - `H-frame`: front and rear legs both run full height
 - `P-frame`: rear legs are cut off below the lowest rail zone, while front legs remain full height
+
+Shelf currently has three planner sub-modes:
+
+- `Fixed Shelf`: evenly distributed shelf levels from shelf count
+- `Adjustable Shelf`: explicit shelf openings define the vertical layout while the top shelf stays pinned to the overall height
+- `Hybrid Shelf`: two side-by-side shelf sections share a center frame while keeping separate opening patterns
 
 ## Shelving Assembly View Rules
 

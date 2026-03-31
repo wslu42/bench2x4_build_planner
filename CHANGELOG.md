@@ -16,6 +16,10 @@ All notable changes to this project will be documented in this file.
 - Domain-level guard rails with input normalization
 - `Frame Mode` for shelving with `H-frame` and `P-frame` options
 - Cut list support for `rear-leg` parts in shelving `P-frame` builds
+- Shelf sub-modes: `Fixed Shelf`, `Adjustable Shelf`, and `Hybrid Shelf`
+- Adjustable shelf presets and explicit opening-based shelf layout derivation
+- Domain-level section/layout output so previews and material calculations can share shelf geometry
+- Hybrid shelf section controls, shared center-frame material logic, and a gallery preset
 
 ### Changed
 
@@ -34,6 +38,8 @@ All notable changes to this project will be documented in this file.
 - Gallery shelf examples now default to `P-frame`
 - Gallery assets were relinked and resized to lighter `.jpg` files for faster loading
 - App footer now shows copyright and MIT license text
+- Planner furniture hierarchy now uses `Bench` plus `Shelf` sub-modes instead of a flat bench/shelving split
+- Existing shelving presets now map into the new `Fixed Shelf` model
 
 ### Fixed
 
