@@ -20,6 +20,8 @@ All notable changes to this project will be documented in this file.
 - Adjustable shelf presets and explicit opening-based shelf layout derivation
 - Domain-level section/layout output so previews and material calculations can share shelf geometry
 - Hybrid shelf section controls, shared center-frame material logic, and a gallery preset
+- `Wooden Pumpkin` decor mode with `M / L` presets, body-board-count driven sizing, user-adjustable cut length clamped to a golden-ratio range, board-only material output, and preview rendering
+- Wooden pumpkin gallery presets using the new pumpkin reference photo
 
 ### Changed
 
@@ -40,6 +42,7 @@ All notable changes to this project will be documented in this file.
 - App footer now shows copyright and MIT license text
 - Planner furniture hierarchy now uses `Bench` plus `Shelf` sub-modes instead of a flat bench/shelving split
 - Existing shelving presets now map into the new `Fixed Shelf` model
+- Gallery category chips now cover bench, shelf, and pumpkin builds
 
 ### Fixed
 

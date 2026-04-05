@@ -1011,6 +1011,11 @@ th {
   color: #eff6ff;
 }
 
+.gallery-chip-pumpkin {
+  background: #7c4f2a;
+  color: #fff3e9;
+}
+
 .gallery-card-description {
   margin: 12px 0 14px;
   color: #6f5640;

@@ -3,6 +3,8 @@ import {
   BOARD_THICKNESS,
   BOARD_WIDTH,
   deriveDesign,
+  derivePumpkinBodyWidth,
+  derivePumpkinCutBounds,
   formatInches,
   SAW_KERF,
   STOCK_LENGTH,
@@ -13,12 +15,15 @@ import {
   type FrameMode,
   type FurnitureType,
   type HybridShelfInputs,
+  type PumpkinInputs,
+  type PumpkinSize,
   type ShelfMode,
   type AdjustableShelfInputs,
   type ViewMode,
 } from "./domain";
 import entryBenchImage from "./gallery_asset/entry_bench_L24_D14_H19.jpg";
 import longBenchImage from "./gallery_asset/long_bench_L60_D14_H17p5.jpg";
+import pumpkinImage from "./gallery_asset/wooden_pumpkin_m_l.jpg";
 import threeTierShelfImage from "./gallery_asset/three_tier_shelf_L33_D17p5_H92.jpg";
 import twoTierShelfImage from "./gallery_asset/two_tier_shelf_L51_D17p5_H92.jpg";
 
@@ -30,7 +35,8 @@ type GalleryBuildInputs =
   | Omit<BenchInputs, "maxSpan">
   | Omit<FixedShelfInputs, "maxSpan">
   | Omit<AdjustableShelfInputs, "maxSpan">
-  | Omit<HybridShelfInputs, "maxSpan">;
+  | Omit<HybridShelfInputs, "maxSpan">
+  | PumpkinInputs;
 type LocalizedText = Record<Locale, string>;
 
 type GalleryBuild = {
@@ -128,6 +134,16 @@ function IconToggle<T extends string>({
 const DEFAULT_BOARD_UNIT_PRICE = 4.15;
 const DEFAULT_SCREW_UNIT_PRICE = 0.06;
 const LOCALE_STORAGE_KEY = "justuse2x4-locale";
+const PUMPKIN_PRESETS = {
+  m: {
+    bodyBoardCount: 4,
+    cutLength: derivePumpkinBodyWidth(4),
+  },
+  l: {
+    bodyBoardCount: 6,
+    cutLength: derivePumpkinBodyWidth(6),
+  },
+} as const;
 
 const UI_STRINGS = {
   en: {
@@ -146,6 +162,7 @@ const UI_STRINGS = {
     shelfLevels: "Shelf Levels",
     bench: "Bench",
     shelving: "Shelf",
+    pumpkin: "Pumpkin",
     frameMode: "Frame Style",
     hFrame: "H-frame",
     pFrame: "P-frame",
@@ -226,6 +243,7 @@ const UI_STRINGS = {
     showHide: "Show",
     boards: "Boards",
     legs: "Legs",
+    stem: "Stem",
     explodeAmount: "Pull Apart",
     buildConstraintWarning: "Build Limit Warning",
     depthLabel: "Depth {value}",
@@ -237,6 +255,18 @@ const UI_STRINGS = {
     clearanceLabel: "Clearance {value}",
     levelGapLabel: "Level Gap {value}",
     floorZero: 'FLOOR 0"',
+    pumpkinSize: "Pumpkin Size",
+    mediumSize: "M",
+    largeSize: "L",
+    cutLengthIn: "Cut Length (in)",
+    bodyBoardCount: "Body boards",
+    stemHeightIn: "Stem Height (in)",
+    stemTiltDeg: "Stem Tilt (deg)",
+    pumpkinBoards: "Pumpkin Body Boards",
+    pumpkinStem: "Stem",
+    pumpkinBodyWidth: "Body width",
+    pumpkinCutLength: "Cut length",
+    pumpkinRatioNote: "Cut length can be adjusted within the golden-rectangle range. Default cut length matches body width.",
   },
   "zh-TW": {
     appTitle: "2x4 家具規劃工具",
@@ -254,6 +284,7 @@ const UI_STRINGS = {
     shelfLevels: "層數",
     bench: "長凳",
     shelving: "層架",
+    pumpkin: "南瓜",
     frameMode: "框架模式",
     hFrame: "H 型",
     pFrame: "P 型",
@@ -334,6 +365,7 @@ const UI_STRINGS = {
     showHide: "顯示 / 隱藏",
     boards: "板材",
     legs: "立柱",
+    stem: "蒂頭",
     explodeAmount: "分解程度",
     buildConstraintWarning: "結構限制警示",
     depthLabel: "深度 {value}",
@@ -345,6 +377,18 @@ const UI_STRINGS = {
     clearanceLabel: "離地 {value}",
     levelGapLabel: "層間距 {value}",
     floorZero: '地板 0"',
+    pumpkinSize: "南瓜尺寸",
+    mediumSize: "M",
+    largeSize: "L",
+    cutLengthIn: "切長（英吋）",
+    bodyBoardCount: "主體木塊數",
+    stemHeightIn: "蒂頭高度（英吋）",
+    stemTiltDeg: "蒂頭傾角（度）",
+    pumpkinBoards: "南瓜主體木塊",
+    pumpkinStem: "蒂頭",
+    pumpkinBodyWidth: "主體寬度",
+    pumpkinCutLength: "切長",
+    pumpkinRatioNote: "切長可在黃金矩形比例範圍內調整，預設切長等於主體寬度。",
   },
 } as const;
 
@@ -380,6 +424,8 @@ function getLocalizedPartLabel(
       return t.topBoards;
     case "shelf-board":
       return t.shelfBoards;
+    case "pumpkin-body":
+      return t.pumpkinBoards;
     case "vertical-leg":
       return !isBench && frameMode === "p-frame" ? t.frontLegs : t.verticalLegs;
     case "rear-leg":
@@ -402,6 +448,10 @@ function getDefaultHybridSections() {
     leftOpenings: [14, 14],
     rightOpenings: [18],
   };
+}
+
+function getPumpkinPreset(size: PumpkinSize) {
+  return PUMPKIN_PRESETS[size];
 }
 
 function clampToRange(value: number, min: number, max: number) {
@@ -793,6 +843,44 @@ const GALLERY_BUILDS: GalleryBuild[] = [
       ],
     },
   },
+  {
+    id: "pumpkin-medium",
+    title: {
+      en: "Wooden Pumpkin M",
+      "zh-TW": "木製南瓜 M",
+    },
+    category: "pumpkin",
+    description: {
+      en: "A compact upright 2x4 pumpkin with four body boards and a cut length that starts square and can stretch within a golden-ratio range.",
+      "zh-TW": "使用 4 塊直立 2x4 主體木塊、切長預設為正方形並可在黃金比例範圍內調整的中尺寸木製南瓜。",
+    },
+    imageSrc: pumpkinImage,
+    inputs: {
+      furnitureType: "pumpkin",
+      size: "m",
+      bodyBoardCount: 4,
+      cutLength: 6,
+    },
+  },
+  {
+    id: "pumpkin-large",
+    title: {
+      en: "Wooden Pumpkin L",
+      "zh-TW": "木製南瓜 L",
+    },
+    category: "pumpkin",
+    description: {
+      en: "A larger upright 2x4 pumpkin with six body boards and a cut length that starts square and can stretch within a golden-ratio range.",
+      "zh-TW": "使用 6 塊直立 2x4 主體木塊、切長預設為正方形並可在黃金比例範圍內調整的大尺寸木製南瓜。",
+    },
+    imageSrc: pumpkinImage,
+    inputs: {
+      furnitureType: "pumpkin",
+      size: "l",
+      bodyBoardCount: 6,
+      cutLength: 9,
+    },
+  },
 ];
 
 const GALLERY_PROMO = {
@@ -843,11 +931,15 @@ function App() {
   const [hybridRightLength, setHybridRightLength] = useState(getDefaultHybridSections().rightLength);
   const [hybridLeftOpenings, setHybridLeftOpenings] = useState<number[]>(getDefaultHybridSections().leftOpenings);
   const [hybridRightOpenings, setHybridRightOpenings] = useState<number[]>(getDefaultHybridSections().rightOpenings);
+  const [pumpkinSize, setPumpkinSize] = useState<PumpkinSize>("l");
+  const [pumpkinBodyBoardCount, setPumpkinBodyBoardCount] = useState<number>(getPumpkinPreset("l").bodyBoardCount);
+  const [pumpkinCutLength, setPumpkinCutLength] = useState<number>(getPumpkinPreset("l").cutLength);
   const [frameMode, setFrameMode] = useState<FrameMode>("h-frame");
   const [fillMode, setFillMode] = useState<FillMode>("solid");
   const [galleryPreview, setGalleryPreview] = useState<GalleryPreview | null>(null);
   const colorTheme: ColorTheme = "sunset";
   const t = UI_STRINGS[locale];
+  const pumpkinCutBounds = derivePumpkinCutBounds(pumpkinBodyBoardCount);
   const galleryPromo = GALLERY_PROMO[locale];
   const galleryPromoParagraphs =
     locale === "en"
@@ -912,6 +1004,15 @@ function App() {
       return;
     }
 
+    if (nextType === "pumpkin") {
+      const pumpkinDefaults = getPumpkinPreset("l");
+      setPumpkinSize("l");
+      setPumpkinBodyBoardCount(pumpkinDefaults.bodyBoardCount);
+      setPumpkinCutLength(pumpkinDefaults.cutLength);
+      setViewMode("front");
+      return;
+    }
+
     setHeight(44);
     setMaxSpan(48);
     setBottomRailClearance(6);
@@ -924,6 +1025,13 @@ function App() {
     setHybridLeftOpenings(hybridDefaults.leftOpenings);
     setHybridRightOpenings(hybridDefaults.rightOpenings);
     setFrameMode("h-frame");
+  };
+
+  const handlePumpkinSizeChange = (nextSize: PumpkinSize) => {
+    const preset = getPumpkinPreset(nextSize);
+    setPumpkinSize(nextSize);
+    setPumpkinBodyBoardCount(preset.bodyBoardCount);
+    setPumpkinCutLength(preset.cutLength);
   };
 
   const handleShelfModeChange = (nextMode: ShelfMode) => {
@@ -1072,6 +1180,16 @@ function App() {
 
   const applyBuildPreset = (presetInputs: GalleryBuildInputs) => {
     setFurnitureType(presetInputs.furnitureType);
+    if (presetInputs.furnitureType === "pumpkin") {
+      setPumpkinSize(presetInputs.size);
+      setPumpkinBodyBoardCount(presetInputs.bodyBoardCount);
+      setPumpkinCutLength(presetInputs.cutLength);
+      setViewMode("front");
+      setFillMode("solid");
+      setPageMode("planner");
+      return;
+    }
+
     setLength(presetInputs.length);
     setDepth(presetInputs.depth);
     setHeight(presetInputs.height);
@@ -1117,6 +1235,15 @@ function App() {
         height,
         maxSpan,
         bottomRailClearance,
+      };
+    }
+
+    if (furnitureType === "pumpkin") {
+      return {
+        furnitureType,
+        size: pumpkinSize,
+        bodyBoardCount: pumpkinBodyBoardCount,
+        cutLength: pumpkinCutLength,
       };
     }
 
@@ -1176,6 +1303,9 @@ function App() {
     height,
     length,
     maxSpan,
+    pumpkinBodyBoardCount,
+    pumpkinCutLength,
+    pumpkinSize,
     shelfCount,
     shelfMode,
     shelfOpenings,
@@ -1188,6 +1318,8 @@ function App() {
   const design = useMemo(() => deriveDesign(inputs), [inputs]);
   const effectiveInputs = design.normalizedInputs;
   const isBench = effectiveInputs.furnitureType === "bench";
+  const isShelf = effectiveInputs.furnitureType === "shelf";
+  const isPumpkin = effectiveInputs.furnitureType === "pumpkin";
   const effectiveFrameMode = effectiveInputs.furnitureType === "shelf" ? effectiveInputs.frameMode : undefined;
   const adjustableOpeningMaxes = useMemo(
     () =>
@@ -1241,27 +1373,32 @@ function App() {
   const screwUnitPrice = DEFAULT_SCREW_UNIT_PRICE;
   const boardLineTotal = design.stockPlan.length * boardUnitPrice;
   const screwsLineTotal = design.estimatedScrewCount * screwUnitPrice;
-  const shoppingGrandTotal = boardLineTotal + screwsLineTotal;
+  const shoppingGrandTotal = isPumpkin ? boardLineTotal : boardLineTotal + screwsLineTotal;
   const stockSegmentStyles: Record<string, { fill: string; stroke: string }> = {
     "top-board": { fill: "#FF7B00", stroke: "#BF5C00" },
     "shelf-board": { fill: "#FF7B00", stroke: "#BF5C00" },
     "vertical-leg": { fill: "#B68A2E", stroke: "#8A6822" },
     "rear-leg": { fill: "#B68A2E", stroke: "#8A6822" },
     "side-rail": { fill: "#3A86FF", stroke: "#2B63BF" },
+    "pumpkin-body": { fill: "#FF7B00", stroke: "#BF5C00" },
   };
 
   const ruleBadges = [
     fillTemplate(t.actual2x4, { thickness: BOARD_THICKNESS, width: BOARD_WIDTH }),
     fillTemplate(t.stockBoardLength, { length: STOCK_LENGTH }),
     fillTemplate(t.sawKerf, { kerf: SAW_KERF }),
-    fillTemplate(t.maxSpanBadge, { value: formatInches(effectiveInputs.maxSpan) }),
-    fillTemplate(t.bottomRailClearanceBadge, {
-      value: formatInches(effectiveInputs.bottomRailClearance),
-    }),
+    !isPumpkin ? fillTemplate(t.maxSpanBadge, { value: formatInches(effectiveInputs.maxSpan) }) : null,
+    !isPumpkin
+      ? fillTemplate(t.bottomRailClearanceBadge, {
+          value: formatInches(effectiveInputs.bottomRailClearance),
+        })
+      : `${t.pumpkinBodyWidth}: ${formatInches(effectiveInputs.bodyBoardCount * BOARD_THICKNESS)}`,
     isBench
       ? fillTemplate(t.topBoardCount, { count: design.boardCountPerLevel })
-      : fillTemplate(t.shelfBoardCountPerLevel, { count: design.boardCountPerLevel }),
-    !isBench
+      : isShelf
+        ? fillTemplate(t.shelfBoardCountPerLevel, { count: design.boardCountPerLevel })
+        : `${t.bodyBoardCount}: ${effectiveInputs.bodyBoardCount}`,
+    isShelf
       ? fillTemplate(t.frameModeBadge, {
           mode: effectiveFrameMode === "h-frame" ? t.hFrame : t.pFrame,
         })
@@ -1269,30 +1406,32 @@ function App() {
   ].filter((badge): badge is string => Boolean(badge));
 
   useEffect(() => {
-    if (length !== effectiveInputs.length) {
-      setLength(effectiveInputs.length);
+    if (effectiveInputs.furnitureType !== "pumpkin") {
+      if (length !== effectiveInputs.length) {
+        setLength(effectiveInputs.length);
+      }
+
+      if (depth !== effectiveInputs.depth) {
+        setDepth(effectiveInputs.depth);
+      }
+
+      if (height !== effectiveInputs.height) {
+        setHeight(effectiveInputs.height);
+      }
+
+      if (maxSpan !== effectiveInputs.maxSpan) {
+        setMaxSpan(effectiveInputs.maxSpan);
+      }
+
+      if (bottomRailClearance !== effectiveInputs.bottomRailClearance) {
+        setBottomRailClearance(effectiveInputs.bottomRailClearance);
+      }
     }
 
-    if (depth !== effectiveInputs.depth) {
-      setDepth(effectiveInputs.depth);
-    }
-
-    if (height !== effectiveInputs.height) {
-      setHeight(effectiveInputs.height);
-    }
-
-    if (maxSpan !== effectiveInputs.maxSpan) {
-      setMaxSpan(effectiveInputs.maxSpan);
-    }
-
-    if (bottomRailClearance !== effectiveInputs.bottomRailClearance) {
-      setBottomRailClearance(effectiveInputs.bottomRailClearance);
-    }
-
-    if (!isBench && effectiveInputs.shelfMode === "fixed" && shelfCount !== effectiveInputs.shelfCount) {
+    if (isShelf && effectiveInputs.shelfMode === "fixed" && shelfCount !== effectiveInputs.shelfCount) {
       setShelfCount(effectiveInputs.shelfCount);
     }
-    if (!isBench && effectiveInputs.shelfMode === "adjustable") {
+    if (isShelf && effectiveInputs.shelfMode === "adjustable") {
       const nextOpenings = effectiveInputs.clearOpenings;
       if (
         shelfOpenings.length !== nextOpenings.length ||
@@ -1304,7 +1443,7 @@ function App() {
         setShelfCount(nextOpenings.length + 1);
       }
     }
-    if (!isBench && effectiveInputs.shelfMode === "hybrid") {
+    if (isShelf && effectiveInputs.shelfMode === "hybrid") {
       const [leftSection, rightSection] = effectiveInputs.sections;
       if (hybridLeftLength !== leftSection.sectionLength) {
         setHybridLeftLength(leftSection.sectionLength);
@@ -1325,8 +1464,19 @@ function App() {
         setHybridRightOpenings(rightSection.clearOpenings);
       }
     }
-    if (!isBench && frameMode !== effectiveInputs.frameMode) {
+    if (isShelf && frameMode !== effectiveInputs.frameMode) {
       setFrameMode(effectiveInputs.frameMode);
+    }
+    if (isPumpkin) {
+      if (pumpkinSize !== effectiveInputs.size) {
+        setPumpkinSize(effectiveInputs.size);
+      }
+      if (pumpkinBodyBoardCount !== effectiveInputs.bodyBoardCount) {
+        setPumpkinBodyBoardCount(effectiveInputs.bodyBoardCount);
+      }
+      if (pumpkinCutLength !== effectiveInputs.cutLength) {
+        setPumpkinCutLength(effectiveInputs.cutLength);
+      }
     }
   }, [
     bottomRailClearance,
@@ -1335,8 +1485,13 @@ function App() {
     frameMode,
     height,
     isBench,
+    isShelf,
+    isPumpkin,
     length,
     maxSpan,
+    pumpkinBodyBoardCount,
+    pumpkinCutLength,
+    pumpkinSize,
     shelfCount,
     shelfOpenings,
     hybridLeftLength,
@@ -1399,12 +1554,13 @@ function App() {
                     options={[
                       { value: "bench", label: t.bench },
                       { value: "shelf", label: t.shelving },
+                      { value: "pumpkin", label: t.pumpkin },
                     ]}
                     value={furnitureType}
                     onChange={handleFurnitureTypeChange}
                     caption={locale === "en" ? "Furniture Type" : "家具選項"}
                   />
-                  {!isBench ? (
+                  {isShelf ? (
                     <div className="parameterization-submode">
                       <IconToggle
                         ariaLabel={locale === "en" ? "Shelf Mode" : "Shelf Mode"}
@@ -1437,18 +1593,70 @@ function App() {
                 <div className="parameterization-card parameterization-input-card">
                   <h3>{t.parameterization}</h3>
                   <p className="muted">{t.parameterizationNote}</p>
-                  <section className="planner-input-group">
-                    <div className="planner-input-group-header">
-                      <h4>{getPlannerGroupLabel(locale, "overallSize")}</h4>
-                    </div>
-                    <section className="field-grid">
-                      <NumberField label={t.lengthIn} value={length} min={12} onChange={setLength} />
-                      <NumberField label={t.depthIn} value={depth} min={3.5} onChange={setDepth} />
-                      <NumberField label={t.heightIn} value={height} min={3.5} onChange={handleHeightChange} />
-                      <NumberField label={t.maxSpanIn} value={maxSpan} min={6} step={6} onChange={setMaxSpan} />
+                  {!isPumpkin ? (
+                    <section className="planner-input-group">
+                      <div className="planner-input-group-header">
+                        <h4>{getPlannerGroupLabel(locale, "overallSize")}</h4>
+                      </div>
+                      <section className="field-grid">
+                        <NumberField label={t.lengthIn} value={length} min={12} onChange={setLength} />
+                        <NumberField label={t.depthIn} value={depth} min={3.5} onChange={setDepth} />
+                        <NumberField label={t.heightIn} value={height} min={3.5} onChange={handleHeightChange} />
+                        <NumberField label={t.maxSpanIn} value={maxSpan} min={6} step={6} onChange={setMaxSpan} />
+                      </section>
                     </section>
-                  </section>
-                  {!isBench && shelfMode === "fixed" ? (
+                  ) : (
+                    <section className="planner-input-group">
+                      <div className="planner-input-group-header">
+                        <h4>{t.pumpkinSize}</h4>
+                      </div>
+                      <IconToggle
+                        ariaLabel={t.pumpkinSize}
+                        options={[
+                          { value: "m", label: t.mediumSize },
+                          { value: "l", label: t.largeSize },
+                        ]}
+                        value={pumpkinSize}
+                        onChange={handlePumpkinSizeChange}
+                      />
+                      <section className="field-grid">
+                        <NumberField
+                          label={t.bodyBoardCount}
+                          value={pumpkinBodyBoardCount}
+                          min={3}
+                          step={1}
+                          onChange={(nextValue) => {
+                            const nextCount = Math.max(3, Math.round(nextValue));
+                            const nextBounds = derivePumpkinCutBounds(nextCount);
+                            setPumpkinBodyBoardCount(nextCount);
+                            setPumpkinCutLength(nextBounds.defaultCutLength);
+                          }}
+                        />
+                        <NumberField
+                          label={t.cutLengthIn}
+                          value={pumpkinCutLength}
+                          min={pumpkinCutBounds.min}
+                          max={pumpkinCutBounds.max}
+                          step={0.5}
+                          hint={
+                            locale === "en"
+                              ? `Range ${formatInches(pumpkinCutBounds.min)} - ${formatInches(pumpkinCutBounds.max)}`
+                              : `範圍 ${formatInches(pumpkinCutBounds.min)} - ${formatInches(pumpkinCutBounds.max)}`
+                          }
+                          onChange={(nextValue) =>
+                            setPumpkinCutLength(
+                              Math.max(
+                                pumpkinCutBounds.min,
+                                Math.min(pumpkinCutBounds.max, Math.round(nextValue * 2) / 2),
+                              ),
+                            )
+                          }
+                        />
+                      </section>
+                      <p className="muted">{t.pumpkinRatioNote}</p>
+                    </section>
+                  )}
+                  {isShelf && shelfMode === "fixed" ? (
                     <section className="planner-input-group">
                       <div className="planner-input-group-header">
                         <h4>{getPlannerGroupLabel(locale, "fixedShelfSetup")}</h4>
@@ -1468,7 +1676,7 @@ function App() {
                       </section>
                     </section>
                   ) : null}
-                  {!isBench && shelfMode === "adjustable" ? (
+                  {isShelf && shelfMode === "adjustable" ? (
                     <section className="planner-input-group">
                       <div className="planner-input-group-header">
                         <h4>{getPlannerGroupLabel(locale, "adjustableOpenings")}</h4>
@@ -1526,7 +1734,7 @@ function App() {
                       </div>
                     </section>
                   ) : null}
-                  {!isBench && shelfMode === "hybrid" ? (
+                  {isShelf && shelfMode === "hybrid" ? (
                     <>
                       <section className="planner-input-group">
                         <div className="planner-input-group-header">
@@ -1656,28 +1864,45 @@ function App() {
 
           <section className="panel-section">
             <h3>{t.derivedSummary}</h3>
-            <dl className="summary-grid">
-              <div>
-                <dt>{t.frameCount}</dt>
-                <dd>{design.frameCount}</dd>
-              </div>
-              <div>
-                <dt>{t.extraHFrames}</dt>
-                <dd>{design.extraSupportHFrameCount}</dd>
-              </div>
-              <div>
-                <dt>{t.boardsPerLevel}</dt>
-                <dd>{design.boardCountPerLevel}</dd>
-              </div>
-              <div>
-                <dt>{t.actualClearSpan}</dt>
-                <dd>{formatInches(design.actualClearSpan)}</dd>
-              </div>
-              <div>
-                <dt>{t.bottomRailClearance}</dt>
-                <dd>{formatInches(effectiveInputs.bottomRailClearance)}</dd>
-              </div>
-            </dl>
+            {isPumpkin ? (
+              <dl className="summary-grid">
+                <div>
+                  <dt>{t.bodyBoardCount}</dt>
+                  <dd>{effectiveInputs.bodyBoardCount}</dd>
+                </div>
+                <div>
+                  <dt>{t.pumpkinBodyWidth}</dt>
+                  <dd>{formatInches(effectiveInputs.bodyBoardCount * BOARD_THICKNESS)}</dd>
+                </div>
+                <div>
+                  <dt>{t.pumpkinCutLength}</dt>
+                  <dd>{formatInches(effectiveInputs.cutLength)}</dd>
+                </div>
+              </dl>
+            ) : (
+              <dl className="summary-grid">
+                <div>
+                  <dt>{t.frameCount}</dt>
+                  <dd>{design.frameCount}</dd>
+                </div>
+                <div>
+                  <dt>{t.extraHFrames}</dt>
+                  <dd>{design.extraSupportHFrameCount}</dd>
+                </div>
+                <div>
+                  <dt>{t.boardsPerLevel}</dt>
+                  <dd>{design.boardCountPerLevel}</dd>
+                </div>
+                <div>
+                  <dt>{t.actualClearSpan}</dt>
+                  <dd>{formatInches(design.actualClearSpan)}</dd>
+                </div>
+                <div>
+                  <dt>{t.bottomRailClearance}</dt>
+                  <dd>{formatInches(effectiveInputs.bottomRailClearance)}</dd>
+                </div>
+              </dl>
+            )}
           </section>
         </aside>
 
@@ -1782,12 +2007,14 @@ function App() {
                     <td>${boardUnitPrice.toFixed(2)} {t.perBoard}</td>
                     <td>{design.stockPlan.length}</td>
                   </tr>
-                  <tr>
-                    <td>{t.screws}</td>
-                    <td>2-1/2 in</td>
-                    <td>${screwUnitPrice.toFixed(2)} {t.perEach}</td>
-                    <td>{design.estimatedScrewCount}</td>
-                  </tr>
+                  {isPumpkin ? null : (
+                    <tr>
+                      <td>{t.screws}</td>
+                      <td>2-1/2 in</td>
+                      <td>${screwUnitPrice.toFixed(2)} {t.perEach}</td>
+                      <td>{design.estimatedScrewCount}</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -1795,16 +2022,32 @@ function App() {
               <div className="shopping-total-copy">
                 <span className="shopping-total-label">{t.totalEstimate}</span>
                 <span className="shopping-total-breakdown">
-                  {t.boardsCostBreakdown} ${boardLineTotal.toFixed(2)} + {t.screwsCostBreakdown} ${screwsLineTotal.toFixed(2)}
+                  {isPumpkin
+                    ? `${t.boardsCostBreakdown} $${boardLineTotal.toFixed(2)}`
+                    : `${t.boardsCostBreakdown} $${boardLineTotal.toFixed(2)} + ${t.screwsCostBreakdown} $${screwsLineTotal.toFixed(2)}`}
                 </span>
               </div>
               <strong>${shoppingGrandTotal.toFixed(2)}</strong>
             </div>
-            <p className="material-note">{t.shoppingNote}</p>
             <p className="material-note">
-              {t.pricingReferencePrefix} ${boardUnitPrice.toFixed(2)} {t.pricingReferenceMiddle}{" "}
-              ${screwUnitPrice.toFixed(2)}{t.pricingReferenceSuffix}
+              {isPumpkin
+                ? locale === "en"
+                  ? "Cost is based on the board count from Board Layout only."
+                  : "採購成本僅依 Board Layout 推導出的板材數量計算。"
+                : t.shoppingNote}
             </p>
+            {isPumpkin ? (
+              <p className="material-note">
+                {locale === "en"
+                  ? `${t.pricingReferencePrefix} $${boardUnitPrice.toFixed(2)} per board.`
+                  : `${t.pricingReferencePrefix} $${boardUnitPrice.toFixed(2)}／板。`}
+              </p>
+            ) : (
+              <p className="material-note">
+                {t.pricingReferencePrefix} ${boardUnitPrice.toFixed(2)} {t.pricingReferenceMiddle}{" "}
+                ${screwUnitPrice.toFixed(2)}{t.pricingReferenceSuffix}
+              </p>
+            )}
             <p className="material-note">
               {t.sources}{" "}
               <a
@@ -1813,15 +2056,19 @@ function App() {
                 rel="noreferrer"
               >
                 Home Depot 2x4 stud
-              </a>{" "}
-              and{" "}
-              <a
-                href="https://www.amazon.com/dp/B0C23LJ6LJ?th=1"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Amazon screw listing
               </a>
+              {isPumpkin ? null : (
+                <>
+                  {" "}and{" "}
+                  <a
+                    href="https://www.amazon.com/dp/B0C23LJ6LJ?th=1"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Amazon screw listing
+                  </a>
+                </>
+              )}
               .
             </p>
           </section>
@@ -1845,18 +2092,8 @@ function App() {
                           className="preview-legend-swatch"
                           style={
                             {
-                              "--swatch-color":
-                                part.key === "top-board" || part.key === "shelf-board"
-                                  ? "#FF7B00"
-                                  : part.key === "vertical-leg" || part.key === "rear-leg"
-                                    ? "#B68A2E"
-                                    : "#3A86FF",
-                              backgroundColor:
-                                part.key === "top-board" || part.key === "shelf-board"
-                                  ? "#FF7B00"
-                                  : part.key === "vertical-leg" || part.key === "rear-leg"
-                                    ? "#B68A2E"
-                                    : "#3A86FF",
+                              "--swatch-color": stockSegmentStyles[part.key]?.fill ?? "#d6c4b2",
+                              backgroundColor: stockSegmentStyles[part.key]?.fill ?? "#d6c4b2",
                             } as CSSProperties
                           }
                         />
@@ -1878,24 +2115,33 @@ function App() {
                 <span className="board-optimization-legend-item">
                   <span
                     className="board-optimization-legend-swatch"
-                    style={{ backgroundColor: stockSegmentStyles[isBench ? "top-board" : "shelf-board"].fill }}
+                    style={{
+                      backgroundColor:
+                        stockSegmentStyles[
+                          isBench ? "top-board" : isShelf ? "shelf-board" : "pumpkin-body"
+                        ].fill,
+                    }}
                   />
-                  {isBench ? t.topBoards : t.shelfBoards}
+                  {isBench ? t.topBoards : isShelf ? t.shelfBoards : t.pumpkinBoards}
                 </span>
-                <span className="board-optimization-legend-item">
-                  <span
-                    className="board-optimization-legend-swatch"
-                    style={{ backgroundColor: stockSegmentStyles["vertical-leg"].fill }}
-                  />
-                  {t.verticalLegs}
-                </span>
-                <span className="board-optimization-legend-item">
-                  <span
-                    className="board-optimization-legend-swatch"
-                    style={{ backgroundColor: stockSegmentStyles["side-rail"].fill }}
-                  />
-                  {t.rails}
-                </span>
+                {isPumpkin ? null : (
+                  <>
+                    <span className="board-optimization-legend-item">
+                      <span
+                        className="board-optimization-legend-swatch"
+                        style={{ backgroundColor: stockSegmentStyles["vertical-leg"].fill }}
+                      />
+                      {t.verticalLegs}
+                    </span>
+                    <span className="board-optimization-legend-item">
+                      <span
+                        className="board-optimization-legend-swatch"
+                        style={{ backgroundColor: stockSegmentStyles["side-rail"].fill }}
+                      />
+                      {t.rails}
+                    </span>
+                  </>
+                )}
                 <span className="board-optimization-legend-item">
                   <span className="board-optimization-legend-swatch board-optimization-legend-waste" />
                   {t.waste}
@@ -2035,7 +2281,12 @@ function App() {
                     : null;
                 const buildTitle = build.title[locale];
                 const buildDescription = build.description[locale];
-                const categoryLabel = build.category === "bench" ? t.bench : t.shelving;
+                const categoryLabel =
+                  build.category === "bench"
+                    ? t.bench
+                    : build.category === "shelf"
+                      ? t.shelving
+                      : t.pumpkin;
 
                 return (
                   <article key={build.id} className="gallery-card">
@@ -2060,7 +2311,11 @@ function App() {
                         <div className="gallery-card-actions">
                           <span
                             className={`gallery-chip ${
-                              build.category === "bench" ? "gallery-chip-bench" : "gallery-chip-shelving"
+                              build.category === "bench"
+                                ? "gallery-chip-bench"
+                                : build.category === "shelf"
+                                  ? "gallery-chip-shelving"
+                                  : "gallery-chip-pumpkin"
                             }`}
                           >
                             {categoryLabel}
@@ -2076,10 +2331,19 @@ function App() {
                       </div>
                       <p className="gallery-card-description">{buildDescription}</p>
                       <ul className="gallery-meta">
-                        <li>{`${locale === "zh-TW" ? "長" : "L"} ${formatInches(buildInputs.length)}`}</li>
-                        <li>{`${locale === "zh-TW" ? "深" : "D"} ${formatInches(buildInputs.depth)}`}</li>
-                        <li>{`${locale === "zh-TW" ? "高" : "H"} ${formatInches(buildInputs.height)}`}</li>
-                        <li>{`${t.clearance} ${formatInches(buildInputs.bottomRailClearance)}`}</li>
+                        {buildInputs.furnitureType !== "pumpkin" ? (
+                          <>
+                            <li>{`${locale === "zh-TW" ? "長" : "L"} ${formatInches(buildInputs.length)}`}</li>
+                            <li>{`${locale === "zh-TW" ? "深" : "D"} ${formatInches(buildInputs.depth)}`}</li>
+                            <li>{`${locale === "zh-TW" ? "高" : "H"} ${formatInches(buildInputs.height)}`}</li>
+                            <li>{`${t.clearance} ${formatInches(buildInputs.bottomRailClearance)}`}</li>
+                          </>
+                        ) : (
+                          <>
+                            <li>{`${t.pumpkinBodyWidth} ${formatInches(buildInputs.bodyBoardCount * BOARD_THICKNESS)}`}</li>
+                            <li>{`${t.pumpkinCutLength} ${formatInches(buildInputs.cutLength)}`}</li>
+                          </>
+                        )}
                         {shelfLevelsLabel ? <li>{shelfLevelsLabel}</li> : null}
                         {frameModeLabel ? <li>{frameModeLabel}</li> : null}
                         {shelfModeLabel ? <li>{shelfModeLabel}</li> : null}
@@ -2259,6 +2523,19 @@ function PreviewCanvas({
   const inputs = design.normalizedInputs;
   const [activeOpeningDrag, setActiveOpeningDrag] = useState<OpeningHandle | null>(null);
   const [activeSectionLengthDrag, setActiveSectionLengthDrag] = useState<ActiveSectionLengthDrag | null>(null);
+  const isBench = inputs.furnitureType === "bench";
+  const isShelf = inputs.furnitureType === "shelf";
+  const isPumpkin = inputs.furnitureType === "pumpkin";
+  const pumpkinBodyBoardCount = isPumpkin ? inputs.bodyBoardCount : 0;
+  const pumpkinBodyWidth = pumpkinBodyBoardCount * BOARD_THICKNESS;
+  const pumpkinCutLength = isPumpkin ? inputs.cutLength : 0;
+  const pumpkinStemHeight = isPumpkin ? pumpkinCutLength * 0.3 : 0;
+  const pumpkinMeasuredHeight = pumpkinCutLength;
+  const pumpkinVisualHeight = pumpkinCutLength + pumpkinStemHeight;
+  const displayLength = isPumpkin ? pumpkinBodyWidth : inputs.length;
+  const displayDepth = isPumpkin ? BOARD_WIDTH : inputs.depth;
+  const displayHeight = isPumpkin ? pumpkinVisualHeight : inputs.height;
+  const measuredHeight = isPumpkin ? pumpkinMeasuredHeight : inputs.height;
   const primarySection = design.renderLayout.sections[0];
   const width = 760;
   const height = 540;
@@ -2271,7 +2548,6 @@ function PreviewCanvas({
   const annotationInsetLeft = 108;
   const annotationInsetTop = 40;
   const annotationInsetBottom = 124;
-  const isBench = inputs.furnitureType === "bench";
   const frameCount = primarySection.frameCount;
   const framePositions = primarySection.framePositions;
   const actualClearSpan = primarySection.actualClearSpan;
@@ -2290,16 +2566,16 @@ function PreviewCanvas({
 
   const viewWidth =
     viewMode === "side"
-      ? inputs.depth
+      ? displayDepth
       : isAssemblyLikeView
-        ? inputs.length + inputs.depth * 0.72
-        : inputs.length;
+        ? displayLength + displayDepth * 0.72
+        : displayLength;
   const viewHeight =
     viewMode === "top"
-      ? inputs.depth
+      ? displayDepth
       : isAssemblyLikeView
-        ? inputs.height + inputs.depth * 0.44 + BOARD_THICKNESS
-        : inputs.height;
+        ? displayHeight + displayDepth * 0.44 + BOARD_THICKNESS
+        : displayHeight;
   const assemblyScaleFactor = isAssemblyLikeView ? 0.94 : 1;
   const scale = Math.min(annotationFrameWidth / viewWidth, annotationFrameHeight / viewHeight) * assemblyScaleFactor;
   const contentWidth = viewWidth * scale;
@@ -2316,9 +2592,9 @@ function PreviewCanvas({
   const showClearSpanDimension = actualClearSpan > 0.001;
   const leftDimX = Math.max(capsuleX + 56, x(0) - 18);
   const rightDimX = Math.min(capsuleX + capsuleWidth - 56, xRight + 18);
-  const topNearDimY = yTop(inputs.depth) + 18;
+  const topNearDimY = yTop(displayDepth) + 18;
   const topNearDimTextY = topNearDimY + 28;
-  const topFarDimY = yTop(inputs.depth) + 48;
+  const topFarDimY = yTop(displayDepth) + 48;
   const topFarDimTextY = topFarDimY + (showClearSpanDimension ? 34 : 28);
   const lowerNearDimY = yBottom(0) + 20;
   const lowerNearDimTextY = lowerNearDimY + 28;
@@ -2412,17 +2688,16 @@ function PreviewCanvas({
   const railFill = fillMode === "solid" ? railColor : "url(#railPattern)";
   const supportFill = fillMode === "solid" ? supportColor : "url(#supportPattern)";
   const materialStrokeWidth = fillMode === "pattern" ? 0.75 : 1.5;
-  const bottomRailBottom = inputs.bottomRailClearance;
+  const bottomRailBottom = isPumpkin ? 0 : inputs.bottomRailClearance;
   const bottomRailTop = bottomRailBottom + BOARD_THICKNESS;
-  const innerDepth = inputs.depth - 2 * BOARD_THICKNESS;
-  const visibleLegHeight = isBench ? inputs.height - BOARD_THICKNESS : inputs.height;
-  const assemblyLegHeight =
-    inputs.furnitureType === "shelf" ? visibleLegHeight + BOARD_THICKNESS : visibleLegHeight;
+  const innerDepth = displayDepth - 2 * BOARD_THICKNESS;
+  const visibleLegHeight = isBench ? displayHeight - BOARD_THICKNESS : displayHeight;
+  const assemblyLegHeight = isShelf ? visibleLegHeight + BOARD_THICKNESS : visibleLegHeight;
   const sectionRadius = Math.max(2, Math.min(8, BOARD_THICKNESS * scale * 0.45));
   const shelfBoardOffsets = primarySection.boardOffsets;
   const shelfBoardGap = primarySection.boardGap;
   const topBoardGap =
-    boardCount <= 1 ? 0 : Math.max(0, (inputs.depth - boardCount * BOARD_WIDTH) / (boardCount - 1));
+    boardCount <= 1 ? 0 : Math.max(0, (displayDepth - boardCount * BOARD_WIDTH) / (boardCount - 1));
   const topBoardSideOffsets = Array.from({ length: boardCount }, (_, index) => {
     return index * (BOARD_WIDTH + topBoardGap);
   });
@@ -2482,19 +2757,19 @@ function PreviewCanvas({
   const levelBottoms = primarySection.levelBottoms;
   const sideViewSections = rawWorldSections.map((section, index) => ({
     ...section,
-    ghosted: inputs.furnitureType === "shelf" && inputs.shelfMode === "hybrid" && index > 0,
+    ghosted: isShelf && inputs.shelfMode === "hybrid" && index > 0,
   }));
   const levelGap =
-    !isBench && levelBottoms.length > 1
+    isShelf && levelBottoms.length > 1
       ? Math.max(0, levelBottoms[1] - (levelBottoms[0] + 2 * BOARD_THICKNESS))
       : 0;
   const rearLegBaseHeight =
-    !isBench && inputs.frameMode === "p-frame" && levelBottoms.length > 0
+    isShelf && inputs.frameMode === "p-frame" && levelBottoms.length > 0
       ? bottomRailBottom
       : 0;
   const rearLegVisibleHeight = Math.max(0, visibleLegHeight - rearLegBaseHeight);
   const assemblyRearLegBaseHeight =
-    rearLegBaseHeight + (!isBench && inputs.frameMode === "p-frame" ? BOARD_THICKNESS : 0);
+    rearLegBaseHeight + (isShelf && inputs.frameMode === "p-frame" ? BOARD_THICKNESS : 0);
   const assemblyRearLegHeight = Math.max(0, assemblyLegHeight - assemblyRearLegBaseHeight);
   const explodedBoardLift = viewMode === "assembly" ? BOARD_THICKNESS * 2 * explodeFactor : 0;
   const explodedRailLift = viewMode === "assembly" ? BOARD_THICKNESS * 0.9 * explodeFactor : 0;
@@ -2510,11 +2785,15 @@ function PreviewCanvas({
         { label: t.rails, color: railColor, kind: "rail" as const },
         { label: t.extraSupportFrames, color: supportColor, kind: "support" as const },
       ]
-    : [
+    : isShelf
+      ? [
         { label: t.shelfBoards, color: boardColor, kind: "board" as const },
         { label: t.verticalLegs, color: legColor, kind: "leg" as const },
         { label: t.rails, color: railColor, kind: "rail" as const },
         { label: t.extraSupportFrames, color: supportColor, kind: "support" as const },
+      ]
+      : [
+        { label: t.pumpkinBoards, color: boardColor, kind: "board" as const },
       ];
   const renderScrewMark = (cx: number, cy: number, key: string) => (
     <text
@@ -2835,7 +3114,7 @@ function PreviewCanvas({
     x: originX + (px + pz * assemblySkewX) * scale,
     y: originY + contentHeight - py * scale - pz * assemblySkewY * scale,
   });
-  const assemblyFrontBottomLeft = assemblyProject(0, 0, inputs.depth);
+  const assemblyFrontBottomLeft = assemblyProject(0, 0, displayDepth);
   const assemblyControlWidth = 184;
   const assemblyControlX = capsuleX + capsuleWidth - assemblySidebarWidth + (assemblySidebarWidth - assemblyControlWidth) / 2;
   const assemblyControlHeight = 252;
@@ -2871,6 +3150,12 @@ function PreviewCanvas({
       </g>
     );
   };
+
+  const pumpkinStemLength = isPumpkin ? displayLength * 0.1 : BOARD_THICKNESS;
+  const pumpkinStemDepth = isPumpkin ? displayDepth * 0.3 : BOARD_THICKNESS;
+  const pumpkinStemBaseHeight = pumpkinCutLength - pumpkinStemHeight * 0.2;
+  const pumpkinCornerChamfer = Math.min(BOARD_THICKNESS * 0.5, Math.max(0.375, pumpkinCutLength * 0.08));
+  const pumpkinBoardLefts = Array.from({ length: pumpkinBodyBoardCount }, (_, index) => index * BOARD_THICKNESS);
 
   const renderPrism = (
     key: string,
@@ -3021,7 +3306,51 @@ function PreviewCanvas({
           strokeWidth="2"
         />
 
-        {viewMode === "top" ? (
+        {isPumpkin && viewMode === "top" ? (
+          <>
+            {pumpkinBoardLefts.map((left, index) => (
+              <rect
+                key={`pumpkin-top-board-${index}`}
+                x={x(left)}
+                y={yTop(0)}
+                width={BOARD_THICKNESS * scale}
+                height={displayDepth * scale}
+                fill={boardFill}
+                stroke={boardLineColor}
+                strokeWidth={materialStrokeWidth}
+              />
+            ))}
+            <rect
+              x={x((displayLength - pumpkinStemLength) / 2)}
+              y={yTop((displayDepth - pumpkinStemDepth) / 2)}
+              width={pumpkinStemLength * scale}
+              height={pumpkinStemDepth * scale}
+              fill="#7C4F2A"
+              stroke="#5B391E"
+              strokeWidth={materialStrokeWidth}
+            />
+            <DimensionLine
+              x1={x(0)}
+              y1={topFarDimY}
+              x2={xRight}
+              y2={topFarDimY}
+              label={fillTemplate(t.lengthLabel, { value: formatInches(displayLength) })}
+              textY={topFarDimTextY}
+            />
+            <DimensionLine
+              x1={leftDimX}
+              y1={yTop(0)}
+              x2={leftDimX}
+              y2={yTop(displayDepth)}
+              label={fillTemplate(t.depthLabel, { value: formatInches(displayDepth) })}
+              textX={leftDimX - 12}
+              textY={originY + contentHeight / 2 - 10}
+              textAnchor="end"
+            />
+          </>
+        ) : null}
+
+        {viewMode === "top" && !isPumpkin ? (
           <>
             {frontFramePositions.map((left, index) => (
               <g key={`top-frame-${index}`}>
@@ -3036,7 +3365,7 @@ function PreviewCanvas({
                 />
                 <rect
                   x={x(left)}
-                  y={yTop(inputs.depth - BOARD_THICKNESS)}
+                  y={yTop(displayDepth - BOARD_THICKNESS)}
                   width={BOARD_WIDTH * scale}
                   height={BOARD_THICKNESS * scale}
                   fill={index === 0 || index === frameCount - 1 ? legFill : supportFill}
@@ -3047,7 +3376,7 @@ function PreviewCanvas({
                   x={x(left)}
                   y={yTop(BOARD_THICKNESS)}
                   width={BOARD_WIDTH * scale}
-                  height={(inputs.depth - 2 * BOARD_THICKNESS) * scale}
+                  height={(displayDepth - 2 * BOARD_THICKNESS) * scale}
                   fill={railFill}
                   stroke={railLineColor}
                   strokeWidth={materialStrokeWidth}
@@ -3060,7 +3389,7 @@ function PreviewCanvas({
                   const gap =
                     boardCount <= 1
                       ? 0
-                      : Math.max(0, (inputs.depth - boardCount * BOARD_WIDTH) / (boardCount - 1));
+                    : Math.max(0, (displayDepth - boardCount * BOARD_WIDTH) / (boardCount - 1));
                   const boardY = index * (BOARD_WIDTH + gap);
 
                   return (
@@ -3098,7 +3427,7 @@ function PreviewCanvas({
                   {renderScrewMark(centerX, yTop(BOARD_THICKNESS), `top-screw-upper-${index}`)}
                   {renderScrewMark(
                     centerX,
-                    yTop(inputs.depth - BOARD_THICKNESS),
+                    yTop(displayDepth - BOARD_THICKNESS),
                     `top-screw-lower-${index}`,
                   )}
                 </g>
@@ -3110,7 +3439,7 @@ function PreviewCanvas({
               y1={topFarDimY}
               x2={xRight}
               y2={topFarDimY}
-              label={fillTemplate(t.lengthLabel, { value: formatInches(inputs.length) })}
+              label={fillTemplate(t.lengthLabel, { value: formatInches(displayLength) })}
               textY={topFarDimTextY}
             />
             {showClearSpanDimension ? (
@@ -3127,8 +3456,8 @@ function PreviewCanvas({
               x1={leftDimX}
               y1={yTop(0)}
               x2={leftDimX}
-              y2={yTop(inputs.depth)}
-              label={fillTemplate(t.depthLabel, { value: formatInches(inputs.depth) })}
+              y2={yTop(displayDepth)}
+              label={fillTemplate(t.depthLabel, { value: formatInches(displayDepth) })}
               textX={leftDimX - 12}
               textY={originY + contentHeight / 2 - 10}
               textAnchor="end"
@@ -3136,7 +3465,65 @@ function PreviewCanvas({
           </>
         ) : null}
 
-        {viewMode === "side" ? (
+        {isPumpkin && viewMode === "side" ? (
+          <>
+            <line
+              x1={capsuleX}
+              y1={yBottom(0)}
+              x2={capsuleX + capsuleWidth}
+              y2={yBottom(0)}
+              stroke={datumColor}
+              strokeWidth="2"
+              strokeDasharray="6 5"
+            />
+            <text
+              x={capsuleX + capsuleWidth - 12}
+              y={yBottom(0) + 18}
+              className="datum-label"
+              textAnchor="end"
+            >
+              {t.floorZero}
+            </text>
+            <rect
+              x={x(0)}
+              y={yBottom(pumpkinCutLength)}
+              width={displayDepth * scale}
+              height={pumpkinCutLength * scale}
+              fill={boardFill}
+              stroke={boardLineColor}
+              strokeWidth={materialStrokeWidth}
+            />
+            <rect
+              x={x((displayDepth - pumpkinStemDepth) / 2)}
+              y={yBottom(pumpkinStemBaseHeight + pumpkinStemHeight)}
+              width={pumpkinStemDepth * scale}
+              height={pumpkinStemHeight * scale}
+              fill="#7C4F2A"
+              stroke="#5B391E"
+              strokeWidth={materialStrokeWidth}
+            />
+            <DimensionLine
+              x1={x(0)}
+              y1={lowerFarDimY}
+              x2={xRight}
+              y2={lowerFarDimY}
+              label={fillTemplate(t.depthLabel, { value: formatInches(displayDepth) })}
+              textY={lowerFarDimTextY}
+            />
+            <DimensionLine
+              x1={leftDimX}
+              y1={yBottom(0)}
+              x2={leftDimX}
+              y2={yBottom(measuredHeight)}
+              label={fillTemplate(t.heightLabel, { value: formatInches(measuredHeight) })}
+              textX={leftDimX - 12}
+              textY={originY + contentHeight / 2 - 10}
+              textAnchor="end"
+            />
+          </>
+        ) : null}
+
+        {viewMode === "side" && !isPumpkin ? (
           <>
             <line
               x1={capsuleX}
@@ -3158,22 +3545,22 @@ function PreviewCanvas({
 
             <rect
               x={x(0)}
-              y={yBottom(isBench ? inputs.height - BOARD_THICKNESS : inputs.height)}
+              y={yBottom(isBench ? displayHeight - BOARD_THICKNESS : displayHeight)}
               width={BOARD_THICKNESS * scale}
-              height={(isBench ? inputs.height - BOARD_THICKNESS : inputs.height) * scale}
+              height={(isBench ? displayHeight - BOARD_THICKNESS : displayHeight) * scale}
               fill={legFill}
               stroke={legLineColor}
               strokeWidth={materialStrokeWidth}
             />
             <rect
-              x={x(inputs.depth - BOARD_THICKNESS)}
+              x={x(displayDepth - BOARD_THICKNESS)}
               y={yBottom(
                 isBench
-                  ? inputs.height - BOARD_THICKNESS
+                  ? displayHeight - BOARD_THICKNESS
                   : rearLegBaseHeight + rearLegVisibleHeight,
               )}
               width={BOARD_THICKNESS * scale}
-              height={(isBench ? inputs.height - BOARD_THICKNESS : rearLegVisibleHeight) * scale}
+              height={(isBench ? displayHeight - BOARD_THICKNESS : rearLegVisibleHeight) * scale}
               fill={legFill}
               stroke={legLineColor}
               strokeWidth={materialStrokeWidth}
@@ -3183,8 +3570,8 @@ function PreviewCanvas({
               <>
                 <rect
                   x={x(BOARD_THICKNESS)}
-                  y={yBottom(inputs.height - BOARD_THICKNESS)}
-                  width={(inputs.depth - 2 * BOARD_THICKNESS) * scale}
+                  y={yBottom(displayHeight - BOARD_THICKNESS)}
+                  width={(displayDepth - 2 * BOARD_THICKNESS) * scale}
                   height={BOARD_THICKNESS * scale}
                   fill={railFill}
                   stroke={railLineColor}
@@ -3193,7 +3580,7 @@ function PreviewCanvas({
                 <rect
                   x={x(BOARD_THICKNESS)}
                   y={yBottom(bottomRailTop)}
-                  width={(inputs.depth - 2 * BOARD_THICKNESS) * scale}
+                  width={(displayDepth - 2 * BOARD_THICKNESS) * scale}
                   height={BOARD_THICKNESS * scale}
                   fill={railFill}
                   stroke={railLineColor}
@@ -3203,7 +3590,7 @@ function PreviewCanvas({
                   <rect
                     key={`top-board-side-${boardIndex}`}
                     x={x(offset)}
-                    y={yBottom(inputs.height)}
+                    y={yBottom(displayHeight)}
                     width={BOARD_WIDTH * scale}
                     height={BOARD_THICKNESS * scale}
                     rx={sectionRadius}
@@ -3215,12 +3602,12 @@ function PreviewCanvas({
                 ))}
                 {renderScrewMark(
                   x(BOARD_THICKNESS),
-                  yBottom(inputs.height - 1.5 * BOARD_THICKNESS),
+                  yBottom(displayHeight - 1.5 * BOARD_THICKNESS),
                   "bench-side-upper-left",
                 )}
                 {renderScrewMark(
-                  x(inputs.depth - BOARD_THICKNESS),
-                  yBottom(inputs.height - 1.5 * BOARD_THICKNESS),
+                  x(displayDepth - BOARD_THICKNESS),
+                  yBottom(displayHeight - 1.5 * BOARD_THICKNESS),
                   "bench-side-upper-right",
                 )}
                 {renderScrewMark(
@@ -3229,7 +3616,7 @@ function PreviewCanvas({
                   "bench-side-lower-left",
                 )}
                 {renderScrewMark(
-                  x(inputs.depth - BOARD_THICKNESS),
+                  x(displayDepth - BOARD_THICKNESS),
                   yBottom(bottomRailBottom + BOARD_THICKNESS / 2),
                   "bench-side-lower-right",
                 )}
@@ -3255,7 +3642,7 @@ function PreviewCanvas({
                         <rect
                           x={x(BOARD_THICKNESS)}
                           y={yBottom(bottom + BOARD_THICKNESS)}
-                          width={(inputs.depth - 2 * BOARD_THICKNESS) * scale}
+                          width={(displayDepth - 2 * BOARD_THICKNESS) * scale}
                           height={BOARD_THICKNESS * scale}
                           fill={railStyle.fill}
                           stroke={railStyle.stroke}
@@ -3285,7 +3672,7 @@ function PreviewCanvas({
                                 `shelf-side-left-${sectionIndex}-${index}`,
                               ),
                               renderScrewMark(
-                                x(inputs.depth - BOARD_THICKNESS),
+                            x(displayDepth - BOARD_THICKNESS),
                                 yBottom(bottom + BOARD_THICKNESS / 2),
                                 `shelf-side-right-${sectionIndex}-${index}`,
                               ),
@@ -3301,11 +3688,11 @@ function PreviewCanvas({
             {sameLevelBoardGap > 0.001 && sameLevelBoardOffsets.length > 1 ? (
               <DimensionLine
                 x1={x(sameLevelBoardOffsets[0] + BOARD_WIDTH)}
-                y1={Math.max(capsuleY + 26, yBottom(inputs.height) - 18)}
+                y1={Math.max(capsuleY + 26, yBottom(displayHeight) - 18)}
                 x2={x(sameLevelBoardOffsets[1])}
-                y2={Math.max(capsuleY + 26, yBottom(inputs.height) - 18)}
+                y2={Math.max(capsuleY + 26, yBottom(displayHeight) - 18)}
                 label={fillTemplate(t.boardGapLabel, { value: formatInches(sameLevelBoardGap) })}
-                textY={Math.max(capsuleY + 16, yBottom(inputs.height) - 28)}
+                textY={Math.max(capsuleY + 16, yBottom(displayHeight) - 28)}
               />
             ) : null}
 
@@ -3314,15 +3701,15 @@ function PreviewCanvas({
               y1={showClearSpanDimension ? lowerFarDimY + 28 : lowerFarDimY}
               x2={xRight}
               y2={showClearSpanDimension ? lowerFarDimY + 28 : lowerFarDimY}
-              label={fillTemplate(t.depthLabel, { value: formatInches(inputs.depth) })}
+              label={fillTemplate(t.depthLabel, { value: formatInches(displayDepth) })}
               textY={showClearSpanDimension ? lowerFarDimTextY + 28 : lowerFarDimTextY}
             />
             <DimensionLine
               x1={leftDimX}
               y1={yBottom(0)}
               x2={leftDimX}
-              y2={yBottom(inputs.height)}
-              label={fillTemplate(t.heightLabel, { value: formatInches(inputs.height) })}
+              y2={yBottom(measuredHeight)}
+              label={fillTemplate(t.heightLabel, { value: formatInches(measuredHeight) })}
               textX={leftDimX - 12}
               textY={originY + contentHeight / 2 - 10}
               textAnchor="end"
@@ -3330,9 +3717,9 @@ function PreviewCanvas({
             <DimensionLine
               x1={x(BOARD_THICKNESS)}
               y1={showClearSpanDimension ? lowerNearDimY + 28 : lowerNearDimY}
-              x2={x(inputs.depth - BOARD_THICKNESS)}
+              x2={x(displayDepth - BOARD_THICKNESS)}
               y2={showClearSpanDimension ? lowerNearDimY + 28 : lowerNearDimY}
-              label={fillTemplate(t.railLabel, { value: formatInches(inputs.depth - 2 * BOARD_THICKNESS) })}
+              label={fillTemplate(t.railLabel, { value: formatInches(displayDepth - 2 * BOARD_THICKNESS) })}
               textY={showClearSpanDimension ? lowerNearDimTextY + 28 : lowerNearDimTextY}
             />
             <DimensionLine
@@ -3360,7 +3747,42 @@ function PreviewCanvas({
           </>
         ) : null}
 
-        {isAssemblyLikeView ? (
+        {isPumpkin && isAssemblyLikeView ? (
+          <>
+            {assemblyVisibility.boards
+              ? pumpkinBoardLefts.map((left, index) =>
+                  renderPrism(
+                    `assembly-pumpkin-board-${index}`,
+                    {
+                      x: left + index * explodeFactor * 0.2,
+                      y: 0,
+                      z: 0,
+                      width: BOARD_THICKNESS,
+                      height: pumpkinCutLength,
+                      depth: displayDepth,
+                    },
+                    boardColor,
+                    boardLineColor,
+                  ),
+                )
+              : null}
+            {renderPrism(
+              "assembly-pumpkin-stem",
+              {
+                x: displayLength / 2 - pumpkinStemLength / 2,
+                y: pumpkinStemBaseHeight,
+                z: displayDepth / 2 - pumpkinStemDepth / 2,
+                width: pumpkinStemLength,
+                height: pumpkinStemHeight,
+                depth: pumpkinStemDepth,
+              },
+              "#7C4F2A",
+              "#5B391E",
+            )}
+          </>
+        ) : null}
+
+        {isAssemblyLikeView && !isPumpkin ? (
           <>
             {isBench ? (
               <>
@@ -3371,7 +3793,7 @@ function PreviewCanvas({
                         offsetPrism({
                           x: left,
                           y: 0,
-                          z: inputs.depth - BOARD_THICKNESS,
+                          z: displayDepth - BOARD_THICKNESS,
                           width: BOARD_WIDTH,
                           height: assemblyLegHeight,
                           depth: BOARD_THICKNESS,
@@ -3388,11 +3810,11 @@ function PreviewCanvas({
                           `assembly-top-rail-${index}`,
                           offsetPrism({
                             x: left,
-                            y: inputs.height - 2 * BOARD_THICKNESS,
+                            y: displayHeight - 2 * BOARD_THICKNESS,
                             z: BOARD_THICKNESS,
                             width: BOARD_WIDTH,
                             height: BOARD_THICKNESS,
-                            depth: inputs.depth - 2 * BOARD_THICKNESS,
+                            depth: displayDepth - 2 * BOARD_THICKNESS,
                           }, { y: explodedRailLift }),
                           railColor,
                           railLineColor,
@@ -3405,7 +3827,7 @@ function PreviewCanvas({
                             z: BOARD_THICKNESS,
                             width: BOARD_WIDTH,
                             height: BOARD_THICKNESS,
-                            depth: inputs.depth - 2 * BOARD_THICKNESS,
+                            depth: displayDepth - 2 * BOARD_THICKNESS,
                           }, { y: -explodedLowerRailDrop }),
                           railColor,
                           railLineColor,
@@ -3436,9 +3858,9 @@ function PreviewCanvas({
                         `assembly-top-board-${boardIndex}`,
                         offsetPrism({
                           x: 0,
-                          y: inputs.height - BOARD_THICKNESS,
+                          y: displayHeight - BOARD_THICKNESS,
                           z: offset,
-                          width: inputs.length,
+                          width: displayLength,
                           height: BOARD_THICKNESS,
                           depth: BOARD_WIDTH,
                         }, { y: explodedBoardLift }),
@@ -3470,7 +3892,7 @@ function PreviewCanvas({
                                   z: BOARD_THICKNESS,
                                   width: BOARD_WIDTH,
                                   height: BOARD_THICKNESS,
-                                  depth: inputs.depth - 2 * BOARD_THICKNESS,
+                                  depth: displayDepth - 2 * BOARD_THICKNESS,
                                 }, { y: explodedRailLift }),
                                 railColor,
                                 railLineColor,
@@ -3527,7 +3949,7 @@ function PreviewCanvas({
                               offsetPrism({
                                 x: left,
                                 y: assemblyRearLegBaseHeight,
-                                z: inputs.depth - BOARD_THICKNESS,
+                                z: displayDepth - BOARD_THICKNESS,
                                 width: BOARD_WIDTH,
                                 height: assemblyRearLegHeight,
                                 depth: BOARD_THICKNESS,
@@ -3572,7 +3994,85 @@ function PreviewCanvas({
           </>
         ) : null}
 
-        {viewMode === "front" ? (
+        {isPumpkin && viewMode === "front" ? (
+          <>
+            <line
+              x1={capsuleX}
+              y1={yBottom(0)}
+              x2={capsuleX + capsuleWidth}
+              y2={yBottom(0)}
+              stroke={datumColor}
+              strokeWidth="2"
+              strokeDasharray="6 5"
+            />
+            <text
+              x={capsuleX + capsuleWidth - 12}
+              y={yBottom(0) + 18}
+              className="datum-label"
+              textAnchor="end"
+            >
+              {t.floorZero}
+            </text>
+
+            {pumpkinBoardLefts.map((left, index) => {
+              const isLeftEdge = index === 0;
+              const isRightEdge = index === pumpkinBoardLefts.length - 1;
+              const points = [
+                [x(left + (isLeftEdge ? pumpkinCornerChamfer : 0)), yBottom(0)],
+                [x(left + BOARD_THICKNESS - (isRightEdge ? pumpkinCornerChamfer : 0)), yBottom(0)],
+                [x(left + BOARD_THICKNESS), yBottom(isRightEdge ? pumpkinCornerChamfer : 0)],
+                [x(left + BOARD_THICKNESS), yBottom(pumpkinCutLength - (isRightEdge ? pumpkinCornerChamfer : 0))],
+                [x(left + BOARD_THICKNESS - (isRightEdge ? pumpkinCornerChamfer : 0)), yBottom(pumpkinCutLength)],
+                [x(left + (isLeftEdge ? pumpkinCornerChamfer : 0)), yBottom(pumpkinCutLength)],
+                [x(left), yBottom(pumpkinCutLength - (isLeftEdge ? pumpkinCornerChamfer : 0))],
+                [x(left), yBottom(isLeftEdge ? pumpkinCornerChamfer : 0)],
+              ]
+                .map(([px, py]) => `${px},${py}`)
+                .join(" ");
+
+              return (
+                <polygon
+                  key={`pumpkin-front-board-${index}`}
+                  points={points}
+                  fill={boardFill}
+                  stroke={boardLineColor}
+                  strokeWidth={materialStrokeWidth}
+                />
+              );
+            })}
+
+            <rect
+              x={x(displayLength / 2 - pumpkinStemLength / 2)}
+              y={yBottom(pumpkinStemBaseHeight + pumpkinStemHeight)}
+              width={pumpkinStemLength * scale}
+              height={pumpkinStemHeight * scale}
+              fill="#7C4F2A"
+              stroke="#5B391E"
+              strokeWidth={materialStrokeWidth}
+            />
+
+            <DimensionLine
+              x1={x(0)}
+              y1={lowerFarDimY}
+              x2={xRight}
+              y2={lowerFarDimY}
+              label={fillTemplate(t.lengthLabel, { value: formatInches(displayLength) })}
+              textY={lowerFarDimTextY}
+            />
+            <DimensionLine
+              x1={leftDimX}
+              y1={yBottom(0)}
+              x2={leftDimX}
+              y2={yBottom(measuredHeight)}
+              label={fillTemplate(t.heightLabel, { value: formatInches(measuredHeight) })}
+              textX={leftDimX - 12}
+              textY={originY + contentHeight / 2 - 10}
+              textAnchor="end"
+            />
+          </>
+        ) : null}
+
+        {viewMode === "front" && !isPumpkin ? (
           <>
             <line
               x1={capsuleX}
@@ -3597,7 +4097,7 @@ function PreviewCanvas({
                   <g key={`front-rail-pair-${index}`}>
                     <rect
                       x={x(left)}
-                      y={yBottom(inputs.height - BOARD_THICKNESS)}
+                      y={yBottom(displayHeight - BOARD_THICKNESS)}
                       width={BOARD_WIDTH * scale}
                       height={BOARD_THICKNESS * scale}
                       fill={railFill}
@@ -3670,7 +4170,7 @@ function PreviewCanvas({
             {isBench ? (
               <rect
                 x={x(0)}
-                y={yBottom(inputs.height)}
+                y={yBottom(displayHeight)}
                 width={contentWidth}
                 height={BOARD_THICKNESS * scale}
                 fill={boardFill}
@@ -3684,7 +4184,7 @@ function PreviewCanvas({
                   <g key={`front-top-screws-${index}`}>
                     {renderScrewMark(
                       x(left + BOARD_WIDTH / 2),
-                      yBottom(inputs.height - 1.5 * BOARD_THICKNESS),
+                      yBottom(displayHeight - 1.5 * BOARD_THICKNESS),
                       `front-top-upper-${index}`,
                     )}
                     {renderScrewMark(
@@ -3702,7 +4202,7 @@ function PreviewCanvas({
                     ),
                   )}
 
-            {inputs.furnitureType === "shelf" && inputs.shelfMode !== "fixed"
+            {isShelf && inputs.shelfMode !== "fixed"
               ? openingHandles.map((handle) => (
                   <g
                     key={`opening-handle-${handle.key}`}
@@ -3783,15 +4283,15 @@ function PreviewCanvas({
               y1={lowerFarDimY}
               x2={xRight}
               y2={lowerFarDimY}
-              label={fillTemplate(t.lengthLabel, { value: formatInches(inputs.length) })}
+              label={fillTemplate(t.lengthLabel, { value: formatInches(displayLength) })}
               textY={lowerFarDimTextY}
             />
             <DimensionLine
               x1={leftDimX}
               y1={yBottom(0)}
               x2={leftDimX}
-              y2={yBottom(inputs.height)}
-              label={fillTemplate(t.heightLabel, { value: formatInches(inputs.height) })}
+              y2={yBottom(measuredHeight)}
+              label={fillTemplate(t.heightLabel, { value: formatInches(measuredHeight) })}
               textX={leftDimX - 12}
               textY={originY + contentHeight / 2 - 10}
               textAnchor="end"
@@ -3812,9 +4312,9 @@ function PreviewCanvas({
                   <fieldset className="assembly-visibility-controls">
                     <legend>{t.dimensions}</legend>
                     <div className="assembly-dimension-list">
-                      <span>{fillTemplate(t.heightLabel, { value: formatAssemblyDimension(inputs.height) })}</span>
-                      <span>{fillTemplate(t.lengthLabel, { value: formatAssemblyDimension(inputs.length) })}</span>
-                      <span>{fillTemplate(t.depthLabel, { value: formatAssemblyDimension(inputs.depth) })}</span>
+                        <span>{fillTemplate(t.heightLabel, { value: formatAssemblyDimension(measuredHeight) })}</span>
+                        <span>{fillTemplate(t.lengthLabel, { value: formatAssemblyDimension(displayLength) })}</span>
+                        <span>{fillTemplate(t.depthLabel, { value: formatAssemblyDimension(displayDepth) })}</span>
                     </div>
                   </fieldset>
                   <fieldset className="assembly-visibility-controls">
@@ -3832,32 +4332,36 @@ function PreviewCanvas({
                       />
                       <span>{t.boards}</span>
                     </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={assemblyVisibility.legs}
-                        onChange={(event) =>
-                          onAssemblyVisibilityChange({
-                            ...assemblyVisibility,
-                            legs: event.target.checked,
-                          })
-                        }
-                      />
-                      <span>{t.legs}</span>
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={assemblyVisibility.rails}
-                        onChange={(event) =>
-                          onAssemblyVisibilityChange({
-                            ...assemblyVisibility,
-                            rails: event.target.checked,
-                          })
-                        }
-                      />
-                      <span>{t.rails}</span>
-                    </label>
+                    {isPumpkin ? null : (
+                      <>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={assemblyVisibility.legs}
+                            onChange={(event) =>
+                              onAssemblyVisibilityChange({
+                                ...assemblyVisibility,
+                                legs: event.target.checked,
+                              })
+                            }
+                          />
+                          <span>{t.legs}</span>
+                        </label>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={assemblyVisibility.rails}
+                            onChange={(event) =>
+                              onAssemblyVisibilityChange({
+                                ...assemblyVisibility,
+                                rails: event.target.checked,
+                              })
+                            }
+                          />
+                          <span>{t.rails}</span>
+                        </label>
+                      </>
+                    )}
                   </fieldset>
                   <label className="explode-slider">
                     <span>{t.explodeAmount}</span>

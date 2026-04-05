@@ -31,6 +31,7 @@ So this project is my nerdy attempt to make that system easier to use. I wanted 
 - `Shelf > Fixed Shelf`
 - `Shelf > Adjustable Shelf`
 - `Shelf > Hybrid Shelf`
+- `Pumpkin > Wooden Pumpkin`
 
 ## What It Does
 
@@ -44,12 +45,15 @@ So this project is my nerdy attempt to make that system easier to use. I wanted 
 - Optimizes cuts against `8 ft` stock boards
 - Estimates screws from rail-to-leg joints
 - Produces a shopping list with default cost assumptions
+- Includes a `Wooden Pumpkin` decor mode based on upright `2x4` body boards with a fixed decorative stem in preview
 
 ## Current Assumptions
 
 - Material: actual `2x4 = 1.5" x 3.5"`
 - Stock length: `96"`
 - Saw kerf: `1/8"`
+- Wooden pumpkin body width is derived from upright body boards at `1.5"` each in front view
+- Pumpkin presets currently map to `M = 4 boards @ 6"` and `L = 6 boards @ 9"`
 - Frame spacing is derived from `Max Span`
 - `Max Span` means the unsupported clear span between adjacent frames
 - Planner default `Max Span` is `48"` with a minimum of `6"` and `6"` stepping
@@ -69,6 +73,16 @@ Shelf currently has three planner sub-modes:
 - `Fixed Shelf`: evenly distributed shelf levels from shelf count
 - `Adjustable Shelf`: explicit shelf openings define the vertical layout while the top shelf stays pinned to the overall height
 - `Hybrid Shelf`: two side-by-side shelf sections share a center frame while keeping separate opening patterns
+
+## Wooden Pumpkin
+
+`Wooden Pumpkin` is a decor mode rather than a furniture frame.
+
+- The body is built from upright `2x4` blocks, so each visible board contributes `1.5"` of front-view width
+- Body width is derived from upright `2x4` blocks at `1.5"` each in front view
+- Cut length is user-adjustable, defaults to the body width, and is clamped to the golden-rectangle range between `width / φ` and `width × φ`
+- The stem is rendered as fixed decoration in preview, is not user-adjustable, and is not counted as a separate cut part
+- Wooden pumpkin cost/material output is board-only and does not include screws
 
 ## Shelving Assembly View Rules
 
@@ -94,7 +108,7 @@ The fill toggle label in preview is:
 
 In `see-thru` mode for `Assembly`, orange boards and tan leg/support members use `50%` opacity while blue rails remain opaque.
 
-Build issues in preview are shown as an in-canvas `Build Constraint Warning`.
+Build issues in preview are shown below the canvas in a dedicated warning block.
 
 ## Pricing Defaults
 

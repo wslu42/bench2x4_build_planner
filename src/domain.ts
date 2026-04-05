@@ -2,11 +2,13 @@ export const BOARD_THICKNESS = 1.5;
 export const BOARD_WIDTH = 3.5;
 export const STOCK_LENGTH = 96;
 export const SAW_KERF = 0.125;
+export const GOLDEN_RATIO = 1.61803398875;
 
-export type FurnitureType = "bench" | "shelf";
+export type FurnitureType = "bench" | "shelf" | "pumpkin";
 export type ShelfMode = "fixed" | "adjustable" | "hybrid";
 export type FrameMode = "h-frame" | "p-frame";
 export type ViewMode = "top" | "side" | "front" | "assembly";
+export type PumpkinSize = "m" | "l";
 
 export type CommonInputs = {
   depth: number;
@@ -49,15 +51,23 @@ export type HybridShelfInputs = CommonInputs & {
   sections: [HybridShelfSectionInputs, HybridShelfSectionInputs];
 };
 
+export type PumpkinInputs = {
+  furnitureType: "pumpkin";
+  size: PumpkinSize;
+  bodyBoardCount: number;
+  cutLength: number;
+};
+
 export type ShelfInputs = FixedShelfInputs | AdjustableShelfInputs | HybridShelfInputs;
-export type AppInputs = BenchInputs | ShelfInputs;
+export type AppInputs = BenchInputs | ShelfInputs | PumpkinInputs;
 
 export type PartGroup =
   | "top-board"
   | "shelf-board"
   | "vertical-leg"
   | "rear-leg"
-  | "side-rail";
+  | "side-rail"
+  | "pumpkin-body";
 
 export type Part = {
   id?: string;
@@ -153,12 +163,35 @@ function roundWholeNumber(value: number, min: number) {
   return Math.max(min, Math.round(value));
 }
 
+export function derivePumpkinBodyWidth(bodyBoardCount: number) {
+  const safeBoardCount = roundWholeNumber(bodyBoardCount, 3);
+  return safeBoardCount * BOARD_THICKNESS;
+}
+
+export function derivePumpkinCutBounds(bodyBoardCount: number) {
+  const bodyWidth = derivePumpkinBodyWidth(bodyBoardCount);
+  const min = Math.max(BOARD_WIDTH, Math.round((bodyWidth / GOLDEN_RATIO) * 2) / 2);
+  const max = Math.max(min, Math.round(bodyWidth * GOLDEN_RATIO * 2) / 2);
+  const defaultCutLength = Math.max(min, Math.min(max, bodyWidth));
+
+  return {
+    bodyWidth,
+    min,
+    max,
+    defaultCutLength,
+  };
+}
+
 function normalizeOpening(value: number) {
   if (!Number.isFinite(value)) {
     return BOARD_THICKNESS;
   }
 
   return Math.max(BOARD_THICKNESS, Math.round(value * 1000) / 1000);
+}
+
+function normalizePumpkinSize(value: PumpkinSize) {
+  return value === "m" ? "m" : "l";
 }
 
 export function deriveFrameLayout(length: number, maxSpan: number) {
@@ -458,9 +491,37 @@ function normalizeHybridShelfInputs(inputs: HybridShelfInputs, issues: string[])
   };
 }
 
+function normalizePumpkinInputs(inputs: PumpkinInputs, issues: string[]): PumpkinInputs {
+  const safeSize = normalizePumpkinSize(inputs.size);
+  const safeBodyBoardCount = roundWholeNumber(inputs.bodyBoardCount, 3);
+  const cutBounds = derivePumpkinCutBounds(safeBodyBoardCount);
+  const rawCutLength = Number.isFinite(inputs.cutLength) ? inputs.cutLength : cutBounds.defaultCutLength;
+  const safeCutLength = Math.max(cutBounds.min, Math.min(cutBounds.max, Math.round(rawCutLength * 2) / 2));
+
+  if (safeBodyBoardCount !== inputs.bodyBoardCount) {
+    issues.push(`Pumpkin board count was rounded to ${safeBodyBoardCount}.`);
+  }
+  if (safeCutLength !== inputs.cutLength) {
+    issues.push(
+      `Pumpkin cut length was clamped to ${safeCutLength}" within the golden-ratio range (${cutBounds.min}"-${cutBounds.max}").`,
+    );
+  }
+
+  return {
+    furnitureType: "pumpkin",
+    size: safeSize,
+    bodyBoardCount: safeBodyBoardCount,
+    cutLength: safeCutLength,
+  };
+}
+
 function normalizeInputs(inputs: AppInputs, issues: string[]): AppInputs {
   if (inputs.furnitureType === "bench") {
     return normalizeBenchInputs(inputs, issues);
+  }
+
+  if (inputs.furnitureType === "pumpkin") {
+    return normalizePumpkinInputs(inputs, issues);
   }
 
   if (inputs.shelfMode === "fixed") {
@@ -493,6 +554,28 @@ function deriveBenchLayout(inputs: BenchInputs): DerivedLayout {
         boardCountPerLevel,
         boardGap,
         boardOffsets,
+      },
+    ],
+  };
+}
+
+function derivePumpkinLayout(inputs: PumpkinInputs): DerivedLayout {
+  const bodyWidth = inputs.bodyBoardCount * BOARD_THICKNESS;
+
+  return {
+    totalLength: bodyWidth,
+    sections: [
+      {
+        sectionId: "pumpkin-body",
+        offsetX: 0,
+        length: bodyWidth,
+        frameCount: 0,
+        framePositions: [],
+        actualClearSpan: 0,
+        levelBottoms: [],
+        boardCountPerLevel: inputs.bodyBoardCount,
+        boardGap: 0,
+        boardOffsets: Array.from({ length: inputs.bodyBoardCount }, (_, index) => index * BOARD_THICKNESS),
       },
     ],
   };
@@ -563,6 +646,10 @@ function deriveLayout(inputs: AppInputs) {
     return deriveBenchLayout(inputs);
   }
 
+  if (inputs.furnitureType === "pumpkin") {
+    return derivePumpkinLayout(inputs);
+  }
+
   return deriveShelfLayout(inputs);
 }
 
@@ -574,6 +661,14 @@ function validateAndSanitizeLayout(
   const validationIssues: ValidationIssue[] = [];
 
   if (inputs.furnitureType === "bench") {
+    return {
+      renderLayout: layout,
+      validationIssues,
+      layoutStatus: "valid",
+    };
+  }
+
+  if (inputs.furnitureType === "pumpkin") {
     return {
       renderLayout: layout,
       validationIssues,
@@ -643,6 +738,29 @@ function validateAndSanitizeLayout(
 
 function deriveParts(inputs: AppInputs, layout: DerivedLayout, issues: string[]) {
   const primarySection = layout.sections[0];
+
+  if (inputs.furnitureType === "pumpkin") {
+    const parts: Part[] = [
+      {
+        key: "pumpkin-body",
+        label: "Pumpkin Body Boards",
+        purpose: "Visible body boards for the wooden pumpkin",
+        length: inputs.cutLength,
+        quantity: inputs.bodyBoardCount,
+        color: "#d97706",
+      },
+    ];
+
+    return {
+      parts,
+      sideRailLength: 0,
+      legVerticalLength: 0,
+      rearLegLength: 0,
+      boardCountPerLevel: inputs.bodyBoardCount,
+      shelfLevelCount: 1,
+    };
+  }
+
   const sideRailLength = inputs.depth - 2 * BOARD_THICKNESS;
   const legVerticalLength = inputs.furnitureType === "bench" ? inputs.height - BOARD_THICKNESS : inputs.height;
   const shelfLevelCount =
@@ -823,9 +941,10 @@ export function deriveDesign(inputs: AppInputs): DerivedDesign {
   const stockPlan = optimizeStock(parts);
   const totalWaste = stockPlan.reduce((sum, board) => sum + board.waste, 0);
   const totalUsedLength = stockPlan.reduce((sum, board) => sum + board.usedLength, 0);
-  const estimatedScrewCount = parts
-    .filter((part) => part.key === "side-rail")
-    .reduce((sum, part) => sum + part.quantity, 0) * 4;
+  const estimatedScrewCount =
+    normalizedInputs.furnitureType === "pumpkin"
+      ? 0
+      : parts.filter((part) => part.key === "side-rail").reduce((sum, part) => sum + part.quantity, 0) * 4;
 
   return {
     normalizedInputs,
